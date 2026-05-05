@@ -97,6 +97,11 @@ private:
     void setupConnections();
     void loadFromSettings();
     void saveToSettings();
+    /// Write ONLY the selected-color and selected-thickness index keys.
+    /// Used by the click handlers so spam-clicking a preset doesn't
+    /// re-write all colors / thicknesses / per-preset min widths through
+    /// the heavier saveToSettings() path.
+    void saveSelectionToSettings();
     void selectColorPreset(int index);
     void selectThicknessPreset(int index);
     void updateThicknessPreviewColors();

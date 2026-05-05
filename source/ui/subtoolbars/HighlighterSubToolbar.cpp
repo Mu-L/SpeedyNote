@@ -159,9 +159,12 @@ void HighlighterSubToolbar::saveColorsToSettings()
 
 void HighlighterSubToolbar::saveAutoHighlightToSettings()
 {
+    // Save the auto-highlight style only. Selection index is persisted
+    // separately by saveSelectionToSettings() on every preset click; we
+    // used to also write it here as a best-effort fallback, but that's
+    // now redundant and misleading given the function name.
     QSettings settings;
     settings.beginGroup(SETTINGS_GROUP_HIGHLIGHTER);
-    settings.setValue(KEY_SELECTED_COLOR, m_selectedColorIndex);
     settings.setValue(KEY_AUTO_HIGHLIGHT, static_cast<int>(m_autoHighlightStyle));
     settings.endGroup();
 }
@@ -171,6 +174,18 @@ void HighlighterSubToolbar::saveSelectionSourceToSettings()
     QSettings settings;
     settings.beginGroup(SETTINGS_GROUP_HIGHLIGHTER);
     settings.setValue(KEY_SELECTION_SOURCE, static_cast<int>(m_selectionSource));
+    settings.endGroup();
+}
+
+void HighlighterSubToolbar::saveSelectionToSettings()
+{
+    // Write ONLY the selected-color index under the highlighter group. Cheap
+    // enough to call on every preset click. We intentionally do NOT reuse
+    // saveAutoHighlightToSettings() here: it also writes KEY_AUTO_HIGHLIGHT,
+    // which is unrelated to the click and would just be a no-op rewrite.
+    QSettings settings;
+    settings.beginGroup(SETTINGS_GROUP_HIGHLIGHTER);
+    settings.setValue(KEY_SELECTED_COLOR, m_selectedColorIndex);
     settings.endGroup();
 }
 
@@ -249,15 +264,20 @@ void HighlighterSubToolbar::clearTabState(int tabIndex)
 void HighlighterSubToolbar::onColorPresetClicked(int index)
 {
     if (index < 0 || index >= NUM_PRESETS) return;
-    
+
     // Always apply the color when clicked - the preset might show as "selected"
     // but the actual current color could be different (changed via other means)
+    const bool indexChanged = (m_selectedColorIndex != index);
     selectColorPreset(index);
-    
+
     // Emit color change with marker opacity applied
     QColor colorWithOpacity = m_colorButtons[index]->color();
     colorWithOpacity.setAlpha(MARKER_OPACITY);
     emit highlighterColorChanged(colorWithOpacity);
+
+    // Persist new active slot so it survives a restart. Guarded on
+    // indexChanged so spam-clicking the same preset does not write QSettings.
+    if (indexChanged) saveSelectionToSettings();
 }
 
 void HighlighterSubToolbar::onColorEditRequested(int index)

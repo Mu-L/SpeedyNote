@@ -98,6 +98,11 @@ private:
     void loadFromSettings();
     void saveColorsToSettings();
     void saveThicknessesToSettings();
+    /// Write ONLY the selected-color and selected-thickness index keys to
+    /// QSettings. Used by the click handlers so spam-clicks don't trigger
+    /// the heavier saveColorsToSettings()/saveThicknessesToSettings() paths
+    /// (which would re-write all preset colors/thicknesses on every click).
+    void saveSelectionToSettings();
     void selectColorPreset(int index);
     void selectThicknessPreset(int index);
     void updateThicknessPreviewColors();

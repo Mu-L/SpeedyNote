@@ -182,6 +182,11 @@ private:
     void saveColorsToSettings();
     void saveAutoHighlightToSettings();
     void saveSelectionSourceToSettings();
+    /// Write ONLY the selected-color index key under the highlighter group.
+    /// Used by the click handler so spam-clicks don't trigger
+    /// saveAutoHighlightToSettings() (which would re-write the auto-highlight
+    /// style key as a no-op side effect on every click).
+    void saveSelectionToSettings();
     void selectColorPreset(int index);
 
     /// Cheap refresh: updates the trigger-button icon and per-action check state

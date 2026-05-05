@@ -128,18 +128,32 @@ void MarkerSubToolbar::saveColorsToSettings()
 
 void MarkerSubToolbar::saveThicknessesToSettings()
 {
-    // Save marker-specific thicknesses and selections
+    // Save marker-specific thickness presets only. Selection indices are
+    // persisted separately by saveSelectionToSettings() on every preset
+    // click; we used to also write them here as a best-effort fallback,
+    // but that's now redundant and misleading given the function name.
     QSettings settings;
     settings.beginGroup(SETTINGS_GROUP_MARKER);
-    
+
     for (int i = 0; i < NUM_PRESETS; ++i) {
         QString key = KEY_THICKNESS_PREFIX + QString::number(i + 1);
         settings.setValue(key, m_thicknessButtons[i]->thickness());
     }
-    
+
+    settings.endGroup();
+}
+
+void MarkerSubToolbar::saveSelectionToSettings()
+{
+    // Write ONLY the two index keys under the marker group. Cheap enough to
+    // call on every preset click. We intentionally do NOT reuse
+    // saveThicknessesToSettings() here: its name implies it touches the
+    // preset thicknesses, and re-writing all three thickness keys on every
+    // click would be both wasteful and obscure the intent.
+    QSettings settings;
+    settings.beginGroup(SETTINGS_GROUP_MARKER);
     settings.setValue(KEY_SELECTED_COLOR, m_selectedColorIndex);
     settings.setValue(KEY_SELECTED_THICKNESS, m_selectedThicknessIndex);
-    
     settings.endGroup();
 }
 
@@ -258,15 +272,20 @@ void MarkerSubToolbar::clearTabState(int tabIndex)
 void MarkerSubToolbar::onColorPresetClicked(int index)
 {
     if (index < 0 || index >= NUM_PRESETS) return;
-    
+
     // Always apply the color when clicked - the preset might show as "selected"
     // but the actual current color could be different (changed via other means)
+    const bool indexChanged = (m_selectedColorIndex != index);
     selectColorPreset(index);
-    
+
     // Emit color change with marker opacity applied
     QColor colorWithOpacity = m_colorButtons[index]->color();
     colorWithOpacity.setAlpha(MARKER_OPACITY);
     emit markerColorChanged(colorWithOpacity);
+
+    // Persist new active slot so it survives a restart. Guarded on
+    // indexChanged so spam-clicking the same preset does not write QSettings.
+    if (indexChanged) saveSelectionToSettings();
 }
 
 void MarkerSubToolbar::onColorEditRequested(int index)
@@ -296,12 +315,17 @@ void MarkerSubToolbar::onColorEditRequested(int index)
 void MarkerSubToolbar::onThicknessPresetClicked(int index)
 {
     if (index < 0 || index >= NUM_PRESETS) return;
-    
+
     // Always apply the thickness when clicked
+    const bool indexChanged = (m_selectedThicknessIndex != index);
     selectThicknessPreset(index);
-    
+
     // Emit thickness change
     emit markerThicknessChanged(m_thicknessButtons[index]->thickness());
+
+    // Persist new active slot so it survives a restart. Guarded on
+    // indexChanged so spam-clicking the same preset does not write QSettings.
+    if (indexChanged) saveSelectionToSettings();
 }
 
 void MarkerSubToolbar::onThicknessEditRequested(int index)
