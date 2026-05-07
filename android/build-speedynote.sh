@@ -190,6 +190,24 @@ cd "${BUILD_DIR}"
 # become stale if build.gradle changes between runs)
 rm -rf CMakeCache.txt CMakeFiles android-build
 
+# =============================================================================
+# Compile translations BEFORE configuring CMake.
+# resources.qrc references resources/translations/app_*.qm at source-tree
+# paths, so the .qm files must exist there when rcc runs.  Globbing all
+# app_*.ts means newly-added languages are compiled automatically without
+# editing this script.
+# =============================================================================
+LRELEASE_BIN="${QT_HOST}/bin/lrelease"
+if [ -x "${LRELEASE_BIN}" ]; then
+    echo "=== Compiling translations with ${LRELEASE_BIN} ==="
+    for ts in "${WORKSPACE_DIR}"/resources/translations/app_*.ts; do
+        [ -f "${ts}" ] || continue
+        "${LRELEASE_BIN}" "${ts}"
+    done
+else
+    echo "WARNING: lrelease not found at ${LRELEASE_BIN}; relying on committed .qm files"
+fi
+
 echo "=== Configuring with CMake ==="
 
 # Build CMake args

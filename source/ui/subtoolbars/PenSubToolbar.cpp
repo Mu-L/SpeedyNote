@@ -173,6 +173,18 @@ void PenSubToolbar::saveToSettings()
     settings.endGroup();
 }
 
+void PenSubToolbar::saveSelectionToSettings()
+{
+    // Write ONLY the two index keys under the pen group. Cheap enough to
+    // call on every preset click; avoids the heavier saveToSettings() path
+    // (which re-writes every color, thickness, and per-preset min width).
+    QSettings settings;
+    settings.beginGroup(SETTINGS_GROUP);
+    settings.setValue(KEY_SELECTED_COLOR, m_selectedColorIndex);
+    settings.setValue(KEY_SELECTED_THICKNESS, m_selectedThicknessIndex);
+    settings.endGroup();
+}
+
 void PenSubToolbar::refreshFromSettings()
 {
     loadFromSettings();
@@ -276,13 +288,18 @@ void PenSubToolbar::clearTabState(int tabIndex)
 void PenSubToolbar::onColorPresetClicked(int index)
 {
     if (index < 0 || index >= NUM_PRESETS) return;
-    
+
     // Always apply the color when clicked - the preset might show as "selected"
     // but the actual current color could be different (changed via other means)
+    const bool indexChanged = (m_selectedColorIndex != index);
     selectColorPreset(index);
-    
+
     // Emit color change
     emit penColorChanged(m_colorButtons[index]->color());
+
+    // Persist new active slot so it survives a restart. Guarded on
+    // indexChanged so spam-clicking the same preset does not write QSettings.
+    if (indexChanged) saveSelectionToSettings();
 }
 
 void PenSubToolbar::onColorEditRequested(int index)
@@ -312,12 +329,17 @@ void PenSubToolbar::onThicknessPresetClicked(int index)
     if (index < 0 || index >= NUM_PRESETS) return;
 
     // Always apply the thickness when clicked
+    const bool indexChanged = (m_selectedThicknessIndex != index);
     selectThicknessPreset(index);
 
     // Emit thickness change (paired with the preset's min width so the
     // viewport's pressure floor matches the newly-selected preset).
     emit penThicknessChanged(m_thicknessButtons[index]->thickness());
     emit penMinStrokeWidthChanged(m_minWidths[index]);
+
+    // Persist new active slot so it survives a restart. Guarded on
+    // indexChanged so spam-clicking the same preset does not write QSettings.
+    if (indexChanged) saveSelectionToSettings();
 }
 
 void PenSubToolbar::onThicknessEditRequested(int index)

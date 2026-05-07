@@ -82,6 +82,11 @@ private:
     void setupConnections();
     void loadFromSettings();
     void saveToSettings();
+    /// Write ONLY the selected-size index key under the eraser group.
+    /// Used by the click handler so spam-clicking a preset doesn't
+    /// re-write all sizes and the eraser mode through the heavier
+    /// saveToSettings() path.
+    void saveSelectionToSettings();
     void selectSizePreset(int index);
 
     // Widgets

@@ -118,6 +118,17 @@ void EraserSubToolbar::saveToSettings()
     settings.endGroup();
 }
 
+void EraserSubToolbar::saveSelectionToSettings()
+{
+    // Write ONLY the selected-size index under the eraser group. Cheap
+    // enough to call on every preset click; avoids the heavier
+    // saveToSettings() path (which re-writes every size and the mode).
+    QSettings settings;
+    settings.beginGroup(SETTINGS_GROUP);
+    settings.setValue(KEY_SELECTED_SIZE, m_selectedSizeIndex);
+    settings.endGroup();
+}
+
 void EraserSubToolbar::refreshFromSettings()
 {
     loadFromSettings();
@@ -193,13 +204,20 @@ void EraserSubToolbar::clearTabState(int tabIndex)
 void EraserSubToolbar::onSizePresetClicked(int index)
 {
     if (index < 0 || index >= NUM_PRESETS) return;
-    
+
     // Always apply the size when clicked - the preset might show as "selected"
     // but the actual current size could be different (changed via other means)
+    const bool indexChanged = (m_selectedSizeIndex != index);
     selectSizePreset(index);
-    
+
     // Emit size change
     emit eraserSizeChanged(m_sizeButtons[index]->thickness());
+
+    // Persist the new selection so it survives an app restart. Guarded on
+    // indexChanged so spam-clicking the same preset does not write QSettings
+    // every click; the re-emit above still fires unconditionally to handle
+    // the case where the actual current size drifted via another path.
+    if (indexChanged) saveSelectionToSettings();
 }
 
 void EraserSubToolbar::onSizeEditRequested(int index)

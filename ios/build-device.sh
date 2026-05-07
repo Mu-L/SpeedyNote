@@ -129,6 +129,25 @@ fi
 
 mkdir -p "${BUILD_DIR}"
 
+# ---------- Compile translations ----------
+# resources.qrc references resources/translations/app_*.qm at source-tree paths,
+# so the .qm files must exist there when rcc runs as part of the Xcode build.
+# Globbing all app_*.ts means newly-added languages are picked up automatically.
+HOST_LRELEASE="${HOME}/Qt/6.9.3/macos/bin/lrelease"
+if [ ! -x "${HOST_LRELEASE}" ]; then
+    HOST_LRELEASE="$(command -v lrelease || true)"
+fi
+if [ -n "${HOST_LRELEASE}" ] && [ -x "${HOST_LRELEASE}" ]; then
+    echo ""
+    echo "--- Compiling translations (${HOST_LRELEASE}) ---"
+    for ts in "${PROJECT_ROOT}"/resources/translations/app_*.ts; do
+        [ -f "${ts}" ] || continue
+        "${HOST_LRELEASE}" "${ts}"
+    done
+else
+    echo "WARNING: lrelease not found; relying on committed .qm files"
+fi
+
 # ---------- Configure (unless --rebuild) ----------
 if [ "${REBUILD}" = false ]; then
     echo ""
