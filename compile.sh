@@ -87,10 +87,11 @@ build_project() {
     rm -rf build
     mkdir -p build
     
-    # Compile translations if lrelease is available
+    # Compile translations if lrelease is available.
+    # Glob all app_*.ts so newly-added languages are picked up automatically.
     if command_exists lrelease; then
         echo -e "${YELLOW}Compiling translation files...${NC}"
-        /usr/lib/qt6/bin/lrelease ./resources/translations/app_zh.ts ./resources/translations/app_fr.ts ./resources/translations/app_es.ts
+        /usr/lib/qt6/bin/lrelease ./resources/translations/app_*.ts
         cp resources/translations/*.qm build/ 2>/dev/null || true
     else
         echo -e "${YELLOW}Warning: lrelease not found, copying existing .qm files...${NC}"

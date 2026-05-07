@@ -171,7 +171,11 @@ if ($qt5) {
 
 if ($lreleaseExe) {
     Write-Host "Compiling translation files using $lreleaseExe..." -ForegroundColor Cyan
-    & $lreleaseExe ./resources/translations/app_zh.ts ./resources/translations/app_fr.ts ./resources/translations/app_es.ts
+    # Discover all translation sources so newly-added languages are compiled automatically.
+    $tsFiles = Get-ChildItem -Path ".\resources\translations\app_*.ts" -ErrorAction SilentlyContinue
+    if ($tsFiles) {
+        & $lreleaseExe @($tsFiles | ForEach-Object { $_.FullName })
+    }
     Copy-Item -Path ".\resources\translations\*.qm" -Destination ".\build" -Force
 } else {
     $qtVer = if ($qt5) { "qt5" } else { "qt6" }
