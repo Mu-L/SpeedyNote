@@ -134,19 +134,26 @@ void MacMenuBar::populateFileMenu()
 {
     auto* sm = ShortcutManager::instance();
 
+    // Skip-on-null helper: avoids cascading qWarnings if a registry id is
+    // mistyped (sm->action() warns once; QWidget::insertAction would warn
+    // again on null). Kept local so the populate methods stay self-contained.
+    auto add = [sm](QMenu* menu, const QString& id) {
+        if (auto* a = sm->action(id)) menu->addAction(a);
+    };
+
     // Group 1: New
-    m_fileMenu->addAction(sm->action("file.new_paged"));
-    m_fileMenu->addAction(sm->action("file.new_edgeless"));
+    add(m_fileMenu, "file.new_paged");
+    add(m_fileMenu, "file.new_edgeless");
     m_fileMenu->addSeparator();
 
     // Group 2: Open (Open Recent submenu deferred — see QA Q4.1)
-    m_fileMenu->addAction(sm->action("file.open_pdf"));
-    m_fileMenu->addAction(sm->action("file.open_notebook"));
+    add(m_fileMenu, "file.open_pdf");
+    add(m_fileMenu, "file.open_notebook");
     m_fileMenu->addSeparator();
 
     // Group 3: Save / Save As
-    m_fileMenu->addAction(sm->action("file.save"));
-    m_fileMenu->addAction(sm->action("file.save_as"));
+    add(m_fileMenu, "file.save");
+    add(m_fileMenu, "file.save_as");
     m_fileMenu->addSeparator();
 
     // Group 4: Relink PDF — not in ShortcutManager (no shortcut). Owned by
@@ -171,12 +178,12 @@ void MacMenuBar::populateFileMenu()
     m_fileMenu->addSeparator();
 
     // Group 5: Export / Share
-    m_fileMenu->addAction(sm->action("file.export_pdf"));
-    m_fileMenu->addAction(sm->action("file.export"));
+    add(m_fileMenu, "file.export_pdf");
+    add(m_fileMenu, "file.export");
     m_fileMenu->addSeparator();
 
     // Group 6: Close Tab (Quit auto-provided by Qt in App menu via QuitRole)
-    m_fileMenu->addAction(sm->action("file.close_tab"));
+    add(m_fileMenu, "file.close_tab");
 }
 
 // ============================================================================
@@ -185,7 +192,9 @@ void MacMenuBar::populateFileMenu()
 
 void MacMenuBar::populateHelpMenu()
 {
-    m_helpMenu->addAction(ShortcutManager::instance()->action("app.keyboard_shortcuts"));
+    if (auto* a = ShortcutManager::instance()->action("app.keyboard_shortcuts")) {
+        m_helpMenu->addAction(a);
+    }
     m_helpMenu->addSeparator();
 
     QAction* visit = m_helpMenu->addAction(tr("Visit GitHub"));

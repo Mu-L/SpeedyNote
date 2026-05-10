@@ -1573,9 +1573,16 @@ void MainWindow::wireQActionDispatchers()
     //     the entire QApplication lifetime so the connection survives every
     //     MainWindow open/close cycle).
     auto wire = [sm](const QString& id, std::function<void(MainWindow*)> handler) {
+        // Resolve the QAction once and bail out cleanly if the id is unknown,
+        // so a typo produces ONE qWarning (from sm->action()) instead of three
+        // cascading ones (setActionContext + action + connect-with-nullptr).
+        QAction* a = sm->action(id);
+        if (!a) {
+            return;
+        }
         sm->setActionContext(id, Qt::ApplicationShortcut);
-        QObject::connect(sm->action(id), &QAction::triggered, sm, [handler]() {
-            if (auto* w = MainWindow::activeMainWindow()) handler(w);
+        QObject::connect(a, &QAction::triggered, sm, [h = std::move(handler)]() {
+            if (auto* w = MainWindow::activeMainWindow()) h(w);
         });
     };
 
@@ -1625,7 +1632,13 @@ void MainWindow::setupManagedShortcuts()
     // MAC.3: associate each migrated QAction with this MainWindow so its
     // shortcut is registered in this window's shortcut map (required even for
     // ApplicationShortcut context — the action needs at least one widget host).
-    auto bindAction = [this, sm](const QString& id) { addAction(sm->action(id)); };
+    // Skip-on-null mirrors wire(): one warning from sm->action(), no cascade
+    // through QWidget::insertAction's nullptr-warn path.
+    auto bindAction = [this, sm](const QString& id) {
+        if (auto* a = sm->action(id)) {
+            addAction(a);
+        }
+    };
     bindAction("file.save");
     bindAction("file.save_as");
     bindAction("file.new_paged");
@@ -3692,6 +3705,11 @@ void MainWindow::saveDocument()
 // document already has one. Reuses saveNewDocumentWithDialog() which is the
 // single source of truth for the file dialog + DocumentManager::saveDocumentAs
 // pipeline.
+//
+// Mirrors saveDocument()'s post-save flow (sync position before save; refresh
+// tab title + NavigationBar filename + clear modified marker after success)
+// so that after Save As the UI reflects the new file name immediately,
+// matching the existing-path branch of saveDocument().
 void MainWindow::saveDocumentAs()
 {
     if (!m_documentManager || !tabManager()) {
@@ -3701,7 +3719,25 @@ void MainWindow::saveDocumentAs()
     if (!vp) return;
     Document* doc = vp->document();
     if (!doc) return;
-    saveNewDocumentWithDialog(doc);
+
+    // Sync viewport position into the document model before save so the .snb
+    // captures the user's current page / canvas position (matches saveDocument).
+    syncDocumentPosition(doc, vp);
+
+    if (!saveNewDocumentWithDialog(doc)) {
+        return;  // User cancelled or save failed; saveNewDocumentWithDialog already reported errors.
+    }
+
+    // Post-save UI refresh — saveNewDocumentWithDialog has updated doc->name
+    // to the chosen file's basename, so propagate it to the tab and nav bar.
+    int currentIndex = tabManager()->currentIndex();
+    if (currentIndex >= 0) {
+        tabManager()->setTabTitle(currentIndex, doc->name);
+        tabManager()->markTabModified(currentIndex, false);
+    }
+    if (m_navigationBar) {
+        m_navigationBar->setFilename(doc->name);
+    }
 }
 
 void MainWindow::loadDocument()
