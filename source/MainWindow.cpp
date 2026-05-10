@@ -1548,10 +1548,96 @@ void MainWindow::setupUi() {
 // Keyboard Shortcut Hub: Setup and Management
 // ============================================================================
 
+// MAC.3: Wire singleton QAction triggered() signals to handlers via the
+// active-MainWindow dispatch. This runs ONCE per process (guarded by a static
+// flag) so multi-window setups never get double-fire on a single keystroke.
+//
+// Migration recipe for MAC.4-7: add new wire("category.action", lambda) calls
+// here AND remove the corresponding createShortcut() in setupManagedShortcuts()
+// AND add a bindAction("category.action") in setupManagedShortcuts(). The
+// canonical flow is:
+//   keystroke -> Qt shortcut map (active window) -> QAction::triggered ->
+//   dispatcher slot (here) -> activeMainWindow() -> handler.
+void MainWindow::wireQActionDispatchers()
+{
+    static bool s_wired = false;
+    if (s_wired) return;
+    s_wired = true;
+
+    auto* sm = ShortcutManager::instance();
+
+    // Each migrated action gets:
+    //  1. context = ApplicationShortcut (preserves pre-MAC.3 createShortcut
+    //     behaviour, where the shortcut fires from any focused app window).
+    //  2. ONE connect on triggered, with sm as receiver context (sm lives for
+    //     the entire QApplication lifetime so the connection survives every
+    //     MainWindow open/close cycle).
+    auto wire = [sm](const QString& id, std::function<void(MainWindow*)> handler) {
+        sm->setActionContext(id, Qt::ApplicationShortcut);
+        QObject::connect(sm->action(id), &QAction::triggered, sm, [handler]() {
+            if (auto* w = MainWindow::activeMainWindow()) handler(w);
+        });
+    };
+
+    // ----- file.* -----
+    wire("file.save",         [](MainWindow* w){ w->saveDocument(); });
+    wire("file.save_as",      [](MainWindow* w){ w->saveDocumentAs(); });
+    wire("file.new_paged",    [](MainWindow* w){ w->addNewTab(); });
+    wire("file.new_edgeless", [](MainWindow* w){ w->addNewEdgelessTab(); });
+    wire("file.open_pdf",     [](MainWindow* w){ w->openPdfDocument(); });
+    wire("file.open_notebook",[](MainWindow* w){ w->loadFolderDocument(); });
+    wire("file.export",       [](MainWindow* w){
+        if (w->m_navigationBar) emit w->m_navigationBar->shareClicked();
+    });
+    wire("file.export_pdf",   [](MainWindow* w){ w->showPdfExportDialog(); });
+    wire("file.close_tab",    [](MainWindow* w){
+        if (auto* tm = w->tabManager(); tm && tm->tabCount() > 0) {
+            int idx = tm->currentIndex();
+            if (auto* vp = tm->currentViewport()) {
+                emit tm->tabCloseAttempted(idx, vp);
+            }
+        }
+    });
+
+    // ----- app.* (Settings + Keyboard Shortcuts) -----
+    // app.settings replaces both the pre-MAC.3 #ifndef Q_OS_MACOS createShortcut
+    // and the MAC.2 connect inside MacMenuBar::buildAppMenu(). MacMenuBar still
+    // adds the QAction to the App menu and sets its PreferencesRole, but the
+    // triggered() handler lives here so all dispatch goes through one path.
+    wire("app.settings", [](MainWindow* w){
+        ControlPanelDialog dlg(w, w);
+        dlg.exec();
+    });
+    wire("app.keyboard_shortcuts", [](MainWindow* w){
+        ControlPanelDialog dlg(w, w);
+        dlg.switchToKeyboardShortcutsTab();
+        dlg.exec();
+    });
+}
+
 void MainWindow::setupManagedShortcuts()
 {
     auto* sm = ShortcutManager::instance();
-    
+
+    // MAC.3: dispatchers wired once app-wide; this no-ops on subsequent calls.
+    wireQActionDispatchers();
+
+    // MAC.3: associate each migrated QAction with this MainWindow so its
+    // shortcut is registered in this window's shortcut map (required even for
+    // ApplicationShortcut context — the action needs at least one widget host).
+    auto bindAction = [this, sm](const QString& id) { addAction(sm->action(id)); };
+    bindAction("file.save");
+    bindAction("file.save_as");
+    bindAction("file.new_paged");
+    bindAction("file.new_edgeless");
+    bindAction("file.open_pdf");
+    bindAction("file.open_notebook");
+    bindAction("file.export");
+    bindAction("file.export_pdf");
+    bindAction("file.close_tab");
+    bindAction("app.settings");
+    bindAction("app.keyboard_shortcuts");
+
     // Helper lambda to create and register a managed shortcut
     auto createShortcut = [this, sm](const QString& actionId, 
                                       std::function<void()> callback,
@@ -1564,14 +1650,11 @@ void MainWindow::setupManagedShortcuts()
     };
     
     // ===== File Operations =====
-    createShortcut("file.save", [this]() { saveDocument(); });
-    createShortcut("file.new_paged", [this]() { addNewTab(); });
-    createShortcut("file.new_edgeless", [this]() { addNewEdgelessTab(); });
-    createShortcut("file.open_pdf", [this]() { openPdfDocument(); });
-    createShortcut("file.open_notebook", [this]() { loadFolderDocument(); });
-    // file.close_tab - TODO: implement closeCurrentTab()
-    // file.export - TODO: implement export action
-    
+    // MAC.3: file.save / file.save_as / file.new_paged / file.new_edgeless /
+    // file.open_pdf / file.open_notebook / file.close_tab / file.export /
+    // file.export_pdf are now wired via wireQActionDispatchers() above and
+    // associated to this window via bindAction(). No createShortcut needed.
+
     // ===== Document/Page Operations =====
     createShortcut("document.add_page", [this]() { addPageToDocument(); });
     createShortcut("document.insert_page", [this]() { insertPageInDocument(); });
@@ -1662,20 +1745,21 @@ void MainWindow::setupManagedShortcuts()
     });
     
     // ===== Application =====
-    createShortcut("app.settings", [this]() { 
-        // Show control panel dialog
-        ControlPanelDialog dialog(this, this);
-        dialog.exec();
-    });
+    // MAC.3: app.settings and app.keyboard_shortcuts are wired via
+    // wireQActionDispatchers() above. The platform fork that previously
+    // wrapped app.settings in #ifndef Q_OS_MACOS is no longer needed because
+    // the dispatcher pattern doesn't compete with the MacMenuBar's QAction
+    // (the MacMenuBar now only sets MenuRole and addAction; the connect lives
+    // in the dispatcher).
 
 #ifdef Q_OS_MACOS
     {
         // MAC.1: Alternate Cmd+K binding for Settings on macOS (per QA Q3.2 Option B).
-        // The primary binding becomes Cmd+, via ShortcutManager::setMacosDefault,
-        // but Cmd+K is preserved here so existing macOS users (and anyone with
-        // cross-platform muscle memory) keep their old binding. The menu bar
-        // (MAC.2+) will display the primary Cmd+, glyph; this alternate is
-        // hidden but functional.
+        // The primary binding (Cmd+,) is provided by the registry QAction
+        // wired in wireQActionDispatchers(); this alternate is a hand-rolled
+        // QShortcut so existing macOS users (and anyone with cross-platform
+        // muscle memory) keep the Cmd+K binding. Intentionally outside the
+        // registry — see MAC.1 plan.
         auto* alt = new QShortcut(QKeySequence("Ctrl+K"), this);
         alt->setContext(Qt::ApplicationShortcut);
         connect(alt, &QShortcut::activated, this, [this]() {
@@ -1685,12 +1769,6 @@ void MainWindow::setupManagedShortcuts()
     }
 #endif
 
-    createShortcut("app.keyboard_shortcuts", [this]() {
-        // Show control panel dialog and switch to Keyboard Shortcuts tab
-        ControlPanelDialog dialog(this, this);
-        dialog.switchToKeyboardShortcutsTab();
-        dialog.exec();
-    });
     createShortcut("app.find", [this]() {
         // Show PDF search bar (only works for PDF documents)
         showPdfSearchBar();
@@ -1715,16 +1793,8 @@ void MainWindow::setupManagedShortcuts()
     });
     
     // ===== Export/Share =====
-    createShortcut("file.export", [this]() {
-        // Trigger the share/export action (same as NavigationBar share button)
-        if (m_navigationBar) {
-            emit m_navigationBar->shareClicked();
-        }
-    });
-    createShortcut("file.export_pdf", [this]() {
-        showPdfExportDialog();
-    });
-    
+    // MAC.3: file.export and file.export_pdf are wired via wireQActionDispatchers() above.
+
     // ===== Tools (delegated to viewport) =====
     // These need to check if text input is active before firing
     auto createToolShortcut = [this, sm](const QString& actionId, ToolType tool) {
@@ -1862,17 +1932,8 @@ void MainWindow::setupManagedShortcuts()
             tabManager()->switchToPrevTab();
         }
     });
-    createShortcut("file.close_tab", [this]() {
-        // Use tabCloseAttempted signal flow to properly handle unsaved changes
-        if (tabManager() && tabManager()->tabCount() > 0) {
-            int currentIndex = tabManager()->currentIndex();
-            DocumentViewport* vp = tabManager()->currentViewport();
-            if (vp) {
-                emit tabManager()->tabCloseAttempted(currentIndex, vp);
-            }
-        }
-    });
-    
+    // MAC.3: file.close_tab is wired via wireQActionDispatchers() above.
+
     // ===== Zoom Shortcuts =====
     createShortcut("zoom.in", [this]() {
         if (DocumentViewport* vp = currentViewport()) {
@@ -3625,6 +3686,22 @@ void MainWindow::saveDocument()
     if (m_navigationBar) {
         m_navigationBar->setFilename(doc->name);
     }
+}
+
+// MAC.3: "Save As..." entry point. Always prompts for a new path even if the
+// document already has one. Reuses saveNewDocumentWithDialog() which is the
+// single source of truth for the file dialog + DocumentManager::saveDocumentAs
+// pipeline.
+void MainWindow::saveDocumentAs()
+{
+    if (!m_documentManager || !tabManager()) {
+        return;
+    }
+    DocumentViewport* vp = currentViewport();
+    if (!vp) return;
+    Document* doc = vp->document();
+    if (!doc) return;
+    saveNewDocumentWithDialog(doc);
 }
 
 void MainWindow::loadDocument()

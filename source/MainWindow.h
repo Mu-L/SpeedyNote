@@ -379,6 +379,7 @@ private slots:
     
     // Phase doc-1: Document operations
     void saveDocument();          // doc-1.1: Save document to JSON file (Ctrl+S)
+    void saveDocumentAs();        // MAC.3: Always prompt for new path (Ctrl+Shift+S)
     void loadDocument();          // doc-1.2: Load document from JSON file (Ctrl+O)
     void addPageToDocument();     // doc-1.0: Add page at end of document (Ctrl+Shift+A)
     void insertPageInDocument();  // Phase 3: Insert page after current (Ctrl+Shift+I)
@@ -769,6 +770,13 @@ private:
     // Keyboard Shortcut Hub: Managed shortcuts
     QHash<QString, QShortcut*> m_managedShortcuts;
     void setupManagedShortcuts();  // Initialize shortcuts from ShortcutManager
+
+    // MAC.3: One-time, app-wide wiring of QAction triggered() signals to their
+    // handlers via MainWindow::activeMainWindow() dispatch. Static so it runs
+    // exactly once per process regardless of how many MainWindows are created;
+    // each MainWindow still calls addAction() per migrated id so the QAction's
+    // shortcut is registered in that window's shortcut map.
+    static void wireQActionDispatchers();
 
 #ifdef Q_OS_LINUX
     // Palm rejection state (Linux only)

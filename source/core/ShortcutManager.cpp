@@ -110,6 +110,7 @@ void ShortcutManager::registerDefaults()
 {
     // ===== File Operations =====
     registerAction("file.save", "Ctrl+S", tr("Save Document"), tr("File"));
+    registerAction("file.save_as", "Ctrl+Shift+S", tr("Save As..."), tr("File"));  // MAC.3
     registerAction("file.new_paged", "Ctrl+N", tr("New Paged Notebook"), tr("File"));
     registerAction("file.new_edgeless", "Ctrl+Shift+N", tr("New Edgeless Canvas"), tr("File"));
     registerAction("file.open_pdf", "Ctrl+O", tr("Open PDF"), tr("File"));

@@ -87,6 +87,10 @@ protected:
 #include "ios/IOSTouchTracker.h"
 #endif
 
+#ifdef Q_OS_MACOS
+#include "macos/MacMenuBar.h"
+#endif
+
 #ifdef Q_OS_ANDROID
 
 static void logAndroidPaths()
@@ -922,6 +926,11 @@ int main(int argc, char* argv[])
 
     // ========== macOS File Open Handler ==========
 #if defined(Q_OS_MACOS)
+    // MAC.2: Instantiate the global system menu bar before any MainWindow.
+    // The QMenuBar inside MacMenuBar is parent-less so it stays alive for
+    // the QApplication's lifetime and remains visible when no window is open.
+    MacMenuBar::instance();
+
     FileOpenEventFilter fileOpenFilter;
     app.installEventFilter(&fileOpenFilter);
 #endif

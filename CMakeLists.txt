@@ -849,6 +849,17 @@ if(IOS)
     )
 endif()
 
+# macOS desktop-specific sources (system menu bar, About dialog).
+# Excluded from iOS, Android, Windows, Linux. APPLE is true for both macOS
+# and iOS, so the explicit "AND NOT IOS" guard is required.
+set(MACOS_PLATFORM_SOURCES "")
+if(APPLE AND NOT IOS)
+    set(MACOS_PLATFORM_SOURCES
+        source/macos/MacMenuBar.cpp
+        source/macos/AboutDialog.cpp
+    )
+endif()
+
 # Cross-platform utilities (Step 3.11: System notifications)
 set(PLATFORM_SOURCES
     source/platform/SystemNotification.cpp
@@ -888,6 +899,7 @@ set(APP_SOURCES
     ${PLATFORM_SOURCES}
     ${ANDROID_PLATFORM_SOURCES}
     ${IOS_PLATFORM_SOURCES}
+    ${MACOS_PLATFORM_SOURCES}
     ${DESKTOP_ONLY_SOURCES}
         ${QMARKDOWNTEXTEDIT_SOURCES}
     ${QMARKDOWNTEXTEDIT_MOC_SOURCES}
