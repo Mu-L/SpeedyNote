@@ -65,8 +65,10 @@ MacMenuBar::MacMenuBar(QObject* parent) : QObject(parent)
 
     buildAppMenu();
     buildWindowMenu();
-    populateFileMenu();   // MAC.3
-    populateHelpMenu();   // MAC.3
+    populateFileMenu();      // MAC.3
+    populateHelpMenu();      // MAC.3
+    populateEditMenu();      // MAC.4
+    populateDocumentMenu();  // MAC.4
 }
 
 // ============================================================================
@@ -210,6 +212,69 @@ void MacMenuBar::populateHelpMenu()
     // The macOS system Help-menu search field is auto-injected at the top by
     // Qt + AppKit once the Help menu has at least one item. It enables
     // Cmd+Shift+/ to fuzzy-find any menu item app-wide.
+}
+
+// ============================================================================
+// MAC.4: Edit menu — Undo/Redo + Cut/Copy/Paste/Delete + Find
+// ============================================================================
+
+void MacMenuBar::populateEditMenu()
+{
+    auto* sm = ShortcutManager::instance();
+    auto add = [sm](QMenu* menu, const QString& id) {
+        if (auto* a = sm->action(id)) menu->addAction(a);
+    };
+
+    // Group 1: Undo / Redo
+    // edit.redo_alt (Cmd+Y) is intentionally omitted — it is the alternate
+    // Redo binding only and is wired via the dispatcher so the keyboard
+    // shortcut still fires; surfacing two Redo items in the menu would be
+    // redundant and confusing.
+    add(m_editMenu, "edit.undo");
+    add(m_editMenu, "edit.redo");
+    m_editMenu->addSeparator();
+
+    // Group 2: Cut / Copy / Paste / Delete
+    add(m_editMenu, "edit.cut");
+    add(m_editMenu, "edit.copy");
+    add(m_editMenu, "edit.paste");
+    add(m_editMenu, "edit.delete");
+    m_editMenu->addSeparator();
+
+    // Group 3: Find
+    // edit.select_all and edit.deselect are registered in ShortcutManager but
+    // have no handlers anywhere today; intentionally not surfaced here. Add
+    // them when the underlying feature lands.
+    add(m_editMenu, "app.find");
+    add(m_editMenu, "app.find_next");
+    add(m_editMenu, "app.find_prev");
+
+    // Qt + macOS may auto-inject "Start Dictation…" / "Emoji & Symbols" near
+    // the bottom of the Edit menu once it has items; that is intended OS
+    // behavior, not something we control.
+}
+
+// ============================================================================
+// MAC.4: Document menu — Add / Insert / Delete page (PagedOnly)
+// ============================================================================
+
+void MacMenuBar::populateDocumentMenu()
+{
+    auto* sm = ShortcutManager::instance();
+    auto add = [sm](QMenu* menu, const QString& id) {
+        if (auto* a = sm->action(id)) menu->addAction(a);
+    };
+
+    // All three are PagedOnly. ShortcutManager::setActiveDocumentScope()
+    // (plumbed in MAC.1; called from MainWindow's tab/viewport-change paths)
+    // automatically toggles QAction::setEnabled() on each PagedOnly action so
+    // the Document menu greys out atomically when the active tab is edgeless.
+    add(m_documentMenu, "document.add_page");
+    add(m_documentMenu, "document.insert_page");
+    add(m_documentMenu, "document.delete_page");
+
+    // Per QA Q4.4: navigation.go_to_page lives in the View menu (MAC.5),
+    // not duplicated here.
 }
 
 #endif // Q_OS_MACOS

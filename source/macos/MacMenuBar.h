@@ -50,8 +50,10 @@ private:
 
     void buildAppMenu();      // About + Settings (Quit/Hide auto-provided by Qt)
     void buildWindowMenu();   // Minimize/Zoom (Qt auto-provides on macOS)
-    void populateFileMenu();  // MAC.3: New/Open/Save/Save As/Export/Close + Relink PDF
-    void populateHelpMenu();  // MAC.3: Keyboard Shortcuts + Visit GitHub + Report a Bug
+    void populateFileMenu();      // MAC.3: New/Open/Save/Save As/Export/Close + Relink PDF
+    void populateHelpMenu();      // MAC.3: Keyboard Shortcuts + Visit GitHub + Report a Bug
+    void populateEditMenu();      // MAC.4: Undo/Redo + Cut/Copy/Paste/Delete + Find
+    void populateDocumentMenu();  // MAC.4: Add/Insert/Delete page (PagedOnly auto-disable)
 
     static MacMenuBar* s_instance;
 

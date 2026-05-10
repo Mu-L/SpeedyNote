@@ -1110,8 +1110,13 @@ void MainWindow::setupUi() {
         }
     });
 
+#ifndef Q_OS_MACOS
+    // MAC.4: hidden on macOS — once MAC.5 lands the View menu's "Go to Page..."
+    // is the canonical mouse path. Cmd+G keeps working via navigation.go_to_page,
+    // which still uses createShortcut() until MAC.5 migrates view.* / navigation.*.
     QAction *jumpToPageAction = overflowMenu->addAction(tr("Jump to Page..."));
     connect(jumpToPageAction, &QAction::triggered, this, &MainWindow::showJumpToPageDialog);
+#endif
     
     QAction *openControlPanelAction = overflowMenu->addAction(tr("Settings"));
     connect(openControlPanelAction, &QAction::triggered, this, [this]() {
@@ -1620,6 +1625,95 @@ void MainWindow::wireQActionDispatchers()
         dlg.switchToKeyboardShortcutsTab();
         dlg.exec();
     });
+
+    // ----- edit.* (MAC.4) -----
+    // Handler bodies are 1:1 with the pre-MAC.4 createShortcut() lambdas.
+    // edit.select_all and edit.deselect are intentionally NOT migrated: they
+    // are registered in ShortcutManager but have no implementation anywhere
+    // today, so dispatching them would surface dead UI. Add them here when
+    // the underlying feature lands.
+    wire("edit.undo", [](MainWindow* w){
+        if (auto* vp = w->currentViewport()) {
+            w->closeFloatingTextEditor();
+            vp->undo();
+        }
+    });
+    wire("edit.redo", [](MainWindow* w){
+        if (auto* vp = w->currentViewport()) {
+            w->closeFloatingTextEditor();
+            vp->redo();
+        }
+    });
+    // edit.redo_alt is the alternate Redo binding (Ctrl+Y -> Cmd+Y on macOS).
+    // Migrated to the dispatcher so the alt binding still fires; intentionally
+    // NOT added to the macOS Edit menu (the menu shows the primary edit.redo only).
+    wire("edit.redo_alt", [](MainWindow* w){
+        if (auto* vp = w->currentViewport()) {
+            w->closeFloatingTextEditor();
+            vp->redo();
+        }
+    });
+    wire("edit.copy", [](MainWindow* w){
+        // Preserve the QTextBrowser focus fallback that pre-MAC.4 had inline:
+        // if the markdown notes browser has selected text, Cmd+C copies the
+        // browser selection rather than canvas objects. Other text widgets
+        // (QLineEdit, QTextEdit, QPlainTextEdit) handle Cmd+C internally
+        // before the QAction fires, so they don't need an explicit branch.
+        if (auto* tb = qobject_cast<QTextBrowser*>(QApplication::focusWidget())) {
+            if (tb->textCursor().hasSelection()) {
+                tb->copy();
+                return;
+            }
+        }
+        if (auto* vp = w->currentViewport()) vp->handleCopyAction();
+    });
+    wire("edit.cut", [](MainWindow* w){
+        if (auto* vp = w->currentViewport()) vp->handleCutAction();
+    });
+    wire("edit.paste", [](MainWindow* w){
+        if (auto* vp = w->currentViewport()) {
+            vp->handlePasteAction();
+            // Pre-MAC.4 behaviour: clear any pen-tool override that targeted a
+            // different viewport, so a paste into the active viewport doesn't
+            // leave the override pinned to the wrong canvas.
+            if (w->m_toolOverrideViewport && w->m_toolOverrideViewport != vp)
+                w->clearToolOverride(true);
+        }
+    });
+    wire("edit.delete", [](MainWindow* w){
+        if (auto* vp = w->currentViewport()) vp->handleDeleteAction();
+    });
+
+    // ----- app.find* (MAC.4) -----
+    // Find Next / Find Previous use a handler-side gate on m_pdfSearchBar
+    // visibility (no widget-scoped QAction context). This preserves pre-MAC.4
+    // behaviour: F3 / Shift+F3 fire from anywhere but no-op when the search
+    // bar isn't open. The macOS Edit menu items are always enabled and
+    // behave the same way (clicking with no active search is a no-op).
+    wire("app.find", [](MainWindow* w){ w->showPdfSearchBar(); });
+    wire("app.find_next", [](MainWindow* w){
+        auto* sb = w->m_pdfSearchBar;
+        if (!sb || !sb->isVisible()) return;
+        const QString text = sb->searchText();
+        if (text.isEmpty()) return;
+        emit sb->searchNextRequested(text, sb->caseSensitive(), sb->wholeWord());
+    });
+    wire("app.find_prev", [](MainWindow* w){
+        auto* sb = w->m_pdfSearchBar;
+        if (!sb || !sb->isVisible()) return;
+        const QString text = sb->searchText();
+        if (text.isEmpty()) return;
+        emit sb->searchPrevRequested(text, sb->caseSensitive(), sb->wholeWord());
+    });
+
+    // ----- document.* (MAC.4, PagedOnly) -----
+    // These QActions carry Scope::PagedOnly. ShortcutManager::setActiveDocumentScope()
+    // (already plumbed by MAC.1 in MainWindow's tab/viewport-change paths)
+    // will auto-disable them when the active tab is an edgeless document, so
+    // both the keyboard shortcut and the Document menu item grey out together.
+    wire("document.add_page",    [](MainWindow* w){ w->addPageToDocument(); });
+    wire("document.insert_page", [](MainWindow* w){ w->insertPageInDocument(); });
+    wire("document.delete_page", [](MainWindow* w){ w->deletePageInDocument(); });
 }
 
 void MainWindow::setupManagedShortcuts()
@@ -1650,6 +1744,20 @@ void MainWindow::setupManagedShortcuts()
     bindAction("file.close_tab");
     bindAction("app.settings");
     bindAction("app.keyboard_shortcuts");
+    // MAC.4: edit + find + document.* bindings
+    bindAction("edit.undo");
+    bindAction("edit.redo");
+    bindAction("edit.redo_alt");
+    bindAction("edit.copy");
+    bindAction("edit.cut");
+    bindAction("edit.paste");
+    bindAction("edit.delete");
+    bindAction("app.find");
+    bindAction("app.find_next");
+    bindAction("app.find_prev");
+    bindAction("document.add_page");
+    bindAction("document.insert_page");
+    bindAction("document.delete_page");
 
     // Helper lambda to create and register a managed shortcut
     auto createShortcut = [this, sm](const QString& actionId, 
@@ -1669,9 +1777,8 @@ void MainWindow::setupManagedShortcuts()
     // associated to this window via bindAction(). No createShortcut needed.
 
     // ===== Document/Page Operations =====
-    createShortcut("document.add_page", [this]() { addPageToDocument(); });
-    createShortcut("document.insert_page", [this]() { insertPageInDocument(); });
-    createShortcut("document.delete_page", [this]() { deletePageInDocument(); });
+    // MAC.4: document.add_page / insert_page / delete_page are now wired via
+    // wireQActionDispatchers() above and associated to this window via bindAction().
     
     // ===== Navigation =====
     createShortcut("navigation.launcher", [this]() { toggleLauncher(); });
@@ -1782,28 +1889,8 @@ void MainWindow::setupManagedShortcuts()
     }
 #endif
 
-    createShortcut("app.find", [this]() {
-        // Show PDF search bar (only works for PDF documents)
-        showPdfSearchBar();
-    });
-    createShortcut("app.find_next", [this]() {
-        // F3: Find next (only works when search bar is visible)
-        if (m_pdfSearchBar && m_pdfSearchBar->isVisible()) {
-            QString text = m_pdfSearchBar->searchText();
-            if (!text.isEmpty()) {
-                emit m_pdfSearchBar->searchNextRequested(text, m_pdfSearchBar->caseSensitive(), m_pdfSearchBar->wholeWord());
-            }
-        }
-    });
-    createShortcut("app.find_prev", [this]() {
-        // Shift+F3: Find previous (only works when search bar is visible)
-        if (m_pdfSearchBar && m_pdfSearchBar->isVisible()) {
-            QString text = m_pdfSearchBar->searchText();
-            if (!text.isEmpty()) {
-                emit m_pdfSearchBar->searchPrevRequested(text, m_pdfSearchBar->caseSensitive(), m_pdfSearchBar->wholeWord());
-            }
-        }
-    });
+    // MAC.4: app.find / app.find_next / app.find_prev are now wired via
+    // wireQActionDispatchers() above and associated to this window via bindAction().
     
     // ===== Export/Share =====
     // MAC.3: file.export and file.export_pdf are wired via wireQActionDispatchers() above.
@@ -1853,24 +1940,8 @@ void MainWindow::setupManagedShortcuts()
     }
     
     // ===== Edit (delegated to viewport) =====
-    createShortcut("edit.undo", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            closeFloatingTextEditor();
-            vp->undo();
-        }
-    });
-    createShortcut("edit.redo", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            closeFloatingTextEditor();
-            vp->redo();
-        }
-    });
-    createShortcut("edit.redo_alt", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            closeFloatingTextEditor();
-            vp->redo();
-        }
-    });
+    // MAC.4: edit.undo / edit.redo / edit.redo_alt are now wired via
+    // wireQActionDispatchers() above and associated to this window via bindAction().
     
     // ===== Home Key (context-dependent: edgeless origin OR first page) =====
     // Note: edgeless.home and navigation.first_page share the same "Home" key
@@ -2012,35 +2083,10 @@ void MainWindow::setupManagedShortcuts()
     });
     
     // ===== Context-Dependent Edit Operations (delegated to viewport) =====
-    // These behave differently based on current tool and selection
-    createShortcut("edit.copy", [this]() {
-        if (auto *tb = qobject_cast<QTextBrowser *>(QApplication::focusWidget())) {
-            if (tb->textCursor().hasSelection()) {
-                tb->copy();
-                return;
-            }
-        }
-        if (DocumentViewport* vp = currentViewport()) {
-            vp->handleCopyAction();
-        }
-    });
-    createShortcut("edit.cut", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            vp->handleCutAction();
-        }
-    });
-    createShortcut("edit.paste", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            vp->handlePasteAction();
-            if (m_toolOverrideViewport && m_toolOverrideViewport != vp)
-                clearToolOverride(true);
-        }
-    });
-    createShortcut("edit.delete", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            vp->handleDeleteAction();
-        }
-    });
+    // MAC.4: edit.copy / edit.cut / edit.paste / edit.delete are now wired via
+    // wireQActionDispatchers() above and associated to this window via bindAction().
+    // The dispatcher preserves the QTextBrowser focus fallback for Copy and the
+    // cross-viewport tool-override clear for Paste.
     
     // ===== Object Manipulation (delegated to viewport, ObjectSelect tool) =====
     // Z-Order
@@ -4330,6 +4376,27 @@ void MainWindow::focusInEvent(QFocusEvent *event) {
 }
 
 void MainWindow::changeEvent(QEvent *event) {
+    // MAC.4: Window-activation hook. focusInEvent only fires when the
+    // MainWindow itself is the focus widget; on multi-window setups the
+    // active widget is almost always a child (canvas, QTextBrowser, etc.),
+    // so window switches via OS click don't update s_activeMainWindow nor
+    // the active-document scope. Without this, every wireQActionDispatchers()
+    // handler would dispatch to the previously-focused window and the macOS
+    // menu bar (which is global, single-instance) would show the wrong
+    // PagedOnly/EdgelessOnly enable state when the user clicks between two
+    // MainWindows whose documents differ.
+    if (event->type() == QEvent::ActivationChange && isActiveWindow()) {
+        s_activeMainWindow = this;
+        auto* sm = ShortcutManager::instance();
+        if (auto* vp = currentViewport(); vp && vp->document()) {
+            sm->setActiveDocumentScope(vp->document()->isEdgeless()
+                ? ShortcutManager::Scope::EdgelessOnly
+                : ShortcutManager::Scope::PagedOnly);
+        } else {
+            sm->setActiveDocumentScope(ShortcutManager::Scope::Global);
+        }
+    }
+
     // Keep the nav bar's fullscreen toggle in sync with the actual window
     // state. Without this, exiting fullscreen via the macOS green traffic
     // light (or any other OS-level mechanism) leaves the toolbar button stuck
