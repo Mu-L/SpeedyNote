@@ -319,6 +319,20 @@ MainWindow::MainWindow(QWidget *parent)
     
     // Connect SplitViewManager signals (routes through active pane)
     connect(m_splitViewManager, &SplitViewManager::activeViewportChanged, this, [this](DocumentViewport* vp) {
+        // MAC.1: Update ShortcutManager's active document scope so PagedOnly /
+        // EdgelessOnly QActions reflect the new active document. When no
+        // document is loaded, fall back to Global (enable everything).
+        {
+            auto* sm = ShortcutManager::instance();
+            if (vp && vp->document()) {
+                sm->setActiveDocumentScope(vp->document()->isEdgeless()
+                    ? ShortcutManager::Scope::EdgelessOnly
+                    : ShortcutManager::Scope::PagedOnly);
+            } else {
+                sm->setActiveDocumentScope(ShortcutManager::Scope::Global);
+            }
+        }
+
         // Smart tool auto-switch: consume override when user activates the overridden viewport
         if (m_toolOverrideViewport == vp) {
             m_toolOverrideViewport = nullptr;
@@ -1505,6 +1519,17 @@ void MainWindow::setupUi() {
         if (m_debugOverlay) {
             m_debugOverlay->setViewport(currentViewport());
         }
+
+        // MAC.1: Establish initial document scope for the first tab. The
+        // activeViewportChanged signal may have fired before ShortcutManager
+        // had any QActions to enable/disable, so re-apply now in case the
+        // first viewport was already in place.
+        if (auto* vp = currentViewport(); vp && vp->document()) {
+            ShortcutManager::instance()->setActiveDocumentScope(
+                vp->document()->isEdgeless()
+                    ? ShortcutManager::Scope::EdgelessOnly
+                    : ShortcutManager::Scope::PagedOnly);
+        }
     });
     
     // =========================================================================
@@ -1512,6 +1537,11 @@ void MainWindow::setupUi() {
     // All shortcuts now go through ShortcutManager for customization support
     // =========================================================================
     setupManagedShortcuts();
+
+    // MAC.1: Establish this window as the active one immediately, so any
+    // ShortcutManager QAction handler that runs before the first focusInEvent
+    // can still resolve activeMainWindow() to a valid pointer.
+    s_activeMainWindow = this;
 }
 
 // ============================================================================
@@ -1637,6 +1667,24 @@ void MainWindow::setupManagedShortcuts()
         ControlPanelDialog dialog(this, this);
         dialog.exec();
     });
+
+#ifdef Q_OS_MACOS
+    {
+        // MAC.1: Alternate Cmd+K binding for Settings on macOS (per QA Q3.2 Option B).
+        // The primary binding becomes Cmd+, via ShortcutManager::setMacosDefault,
+        // but Cmd+K is preserved here so existing macOS users (and anyone with
+        // cross-platform muscle memory) keep their old binding. The menu bar
+        // (MAC.2+) will display the primary Cmd+, glyph; this alternate is
+        // hidden but functional.
+        auto* alt = new QShortcut(QKeySequence("Ctrl+K"), this);
+        alt->setContext(Qt::ApplicationShortcut);
+        connect(alt, &QShortcut::activated, this, [this]() {
+            ControlPanelDialog dialog(this, this);
+            dialog.exec();
+        });
+    }
+#endif
+
     createShortcut("app.keyboard_shortcuts", [this]() {
         // Show control panel dialog and switch to Keyboard Shortcuts tab
         ControlPanelDialog dialog(this, this);
@@ -4154,6 +4202,30 @@ void MainWindow::removeTabAt(int index) {
 // Phase 3.1.4: New accessor for DocumentViewport
 DocumentViewport* MainWindow::currentViewport() const {
     return m_splitViewManager ? m_splitViewManager->activeViewport() : nullptr;
+}
+
+// MAC.1: track the most recently focused MainWindow for action dispatch.
+QPointer<MainWindow> MainWindow::s_activeMainWindow;
+
+MainWindow* MainWindow::activeMainWindow() {
+    return s_activeMainWindow.data();
+}
+
+void MainWindow::focusInEvent(QFocusEvent *event) {
+    s_activeMainWindow = this;
+    QMainWindow::focusInEvent(event);
+}
+
+void MainWindow::changeEvent(QEvent *event) {
+    // Keep the nav bar's fullscreen toggle in sync with the actual window
+    // state. Without this, exiting fullscreen via the macOS green traffic
+    // light (or any other OS-level mechanism) leaves the toolbar button stuck
+    // in its previous checked state. setFullscreenChecked() is signal-blocked
+    // internally, so this won't recurse into toggleFullscreen().
+    if (event->type() == QEvent::WindowStateChange && m_navigationBar) {
+        m_navigationBar->setFullscreenChecked(isFullScreen());
+    }
+    QMainWindow::changeEvent(event);
 }
 
 int MainWindow::tabCount() const {

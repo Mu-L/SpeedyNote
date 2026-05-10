@@ -222,6 +222,20 @@ public:
     // InkCanvas* currentCanvas();  // MW1.4: Stub - returns nullptr, use currentViewport()
     DocumentViewport* currentViewport() const; // Phase 3.1.4: New accessor for DocumentViewport
     int tabCount() const;  // Returns number of open tabs (used by Launcher for Escape handling)
+
+    /**
+     * @brief Get the currently-active MainWindow instance (MAC.1).
+     *
+     * Tracks the most recently focused MainWindow. Used by ShortcutManager
+     * QAction handlers (and the upcoming MacMenuBar in MAC.2+) to dispatch
+     * actions to the correct window when multiple are open. Survives modal
+     * dialogs (the dialog gets focus, but s_activeMainWindow continues to
+     * point at the underlying MainWindow).
+     *
+     * Returns nullptr if no MainWindow has ever received focus or all have
+     * been destroyed.
+     */
+    static MainWindow* activeMainWindow();
     void switchToTabIndex(int index);  // Switch to a specific tab by index
     void saveSessionTabs();  // Persist open tab paths to QSettings for session restore
 
@@ -291,6 +305,10 @@ public:
 #if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
     static QSharedMemory *sharedMemory;
 #endif
+
+    /// MAC.1: most recently focused MainWindow. QPointer auto-clears on
+    /// destruction so activeMainWindow() returns nullptr safely.
+    static QPointer<MainWindow> s_activeMainWindow;
     
     // Static cleanup method for signal handlers
     static void cleanupSharedResources();
@@ -302,6 +320,8 @@ protected:
     void showEvent(QShowEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;  // New: Handle keyboard shortcuts
     void keyReleaseEvent(QKeyEvent *event) override; // Track Ctrl key release for trackpad pinch-zoom detection
+    void focusInEvent(QFocusEvent *event) override;  // MAC.1: track active MainWindow
+    void changeEvent(QEvent *event) override;        // Sync nav bar fullscreen button when window state changes (e.g. macOS green button)
     // REMOVED: tabletEvent removed - tablet event handling deleted
 
 #ifdef Q_OS_WIN
