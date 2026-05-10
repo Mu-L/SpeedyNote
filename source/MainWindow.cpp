@@ -1111,9 +1111,9 @@ void MainWindow::setupUi() {
     });
 
 #ifndef Q_OS_MACOS
-    // MAC.4: hidden on macOS — once MAC.5 lands the View menu's "Go to Page..."
-    // is the canonical mouse path. Cmd+G keeps working via navigation.go_to_page,
-    // which still uses createShortcut() until MAC.5 migrates view.* / navigation.*.
+    // MAC.4 / MAC.5: hidden on macOS — the View menu's 'Go to Page...' (added
+    // in MAC.5) is the canonical mouse path; Cmd+G keeps working via
+    // navigation.go_to_page (now dispatched through wireQActionDispatchers()).
     QAction *jumpToPageAction = overflowMenu->addAction(tr("Jump to Page..."));
     connect(jumpToPageAction, &QAction::triggered, this, &MainWindow::showJumpToPageDialog);
 #endif
@@ -1714,6 +1714,133 @@ void MainWindow::wireQActionDispatchers()
     wire("document.add_page",    [](MainWindow* w){ w->addPageToDocument(); });
     wire("document.insert_page", [](MainWindow* w){ w->insertPageInDocument(); });
     wire("document.delete_page", [](MainWindow* w){ w->deletePageInDocument(); });
+
+    // ----- zoom.* (MAC.5) -----
+    // zoom.in (Ctrl++/Cmd+Shift+=) is the menu-visible primary; zoom.in_alt
+    // (Ctrl+=/Cmd+=) is the convenience alternate, wired here so the keystroke
+    // still fires but intentionally not surfaced in the macOS View menu (same
+    // convention as MAC.4's edit.redo_alt).
+    wire("zoom.in",        [](MainWindow* w){ if (auto* vp = w->currentViewport()) vp->zoomIn(); });
+    wire("zoom.in_alt",    [](MainWindow* w){ if (auto* vp = w->currentViewport()) vp->zoomIn(); });
+    wire("zoom.out",       [](MainWindow* w){ if (auto* vp = w->currentViewport()) vp->zoomOut(); });
+    wire("zoom.fit",       [](MainWindow* w){ if (auto* vp = w->currentViewport()) vp->zoomToFit(); });
+    wire("zoom.100",       [](MainWindow* w){ if (auto* vp = w->currentViewport()) vp->zoomToActualSize(); });
+    wire("zoom.fit_width", [](MainWindow* w){ if (auto* vp = w->currentViewport()) vp->zoomToWidth(); });
+
+    // ----- page navigation (MAC.5, PagedOnly) -----
+    // navigation.first_page is a brand-new wire in MAC.5: pre-MAC.5 the Home
+    // key was handled exclusively by edgeless.home's createShortcut, which
+    // dispatched by document type. Splitting it into its own PagedOnly wire
+    // (alongside an EdgelessOnly edgeless.home below) lets the macOS View
+    // menu show 'First Page' and 'Return to Origin' as separate items that
+    // grey/ungrey together based on the active document's scope. Both share
+    // the Home key but only one is enabled at a time, so Qt's shortcut router
+    // never sees an ambiguous overload.
+    wire("navigation.prev_page", [](MainWindow* w){
+        if (auto* vp = w->currentViewport(); vp && vp->document() && !vp->document()->isEdgeless()) {
+            const int current = vp->currentPageIndex();
+            if (current > 0) vp->scrollToPage(current - 1);
+        }
+    });
+    wire("navigation.next_page", [](MainWindow* w){
+        if (auto* vp = w->currentViewport(); vp && vp->document() && !vp->document()->isEdgeless()) {
+            const int current = vp->currentPageIndex();
+            const int lastPage = vp->document()->pageCount() - 1;
+            if (current < lastPage) vp->scrollToPage(current + 1);
+        }
+    });
+    wire("navigation.first_page", [](MainWindow* w){
+        if (auto* vp = w->currentViewport(); vp && vp->document() && !vp->document()->isEdgeless()) {
+            vp->scrollToPage(0);
+        }
+    });
+    wire("navigation.last_page", [](MainWindow* w){
+        if (auto* vp = w->currentViewport(); vp && vp->document() && !vp->document()->isEdgeless()) {
+            vp->scrollToPage(vp->document()->pageCount() - 1);
+        }
+    });
+    wire("navigation.go_to_page", [](MainWindow* w){ w->showJumpToPageDialog(); });
+
+    // ----- edgeless navigation (MAC.5, EdgelessOnly) -----
+    // edgeless.home is now strictly EdgelessOnly: returnToOrigin only. The
+    // pre-MAC.5 dispatch-by-doc-type fallback that called scrollToPage(0) on
+    // paged docs has moved to the dedicated navigation.first_page wire above.
+    wire("edgeless.home", [](MainWindow* w){
+        if (auto* vp = w->currentViewport()) vp->returnToOrigin();
+    });
+    // edgeless.go_back is now strictly EdgelessOnly: goBackPosition only.
+    // The pre-MAC.5 paged-Backspace-as-Delete fallback (calling
+    // handleDeleteAction) is intentionally dropped per MAC.5 plan decision Q2.
+    // On paged docs, users use the Delete key (edit.delete) for delete
+    // operations; the QAction's EdgelessOnly scope makes Backspace inert there.
+    wire("edgeless.go_back", [](MainWindow* w){
+        if (auto* vp = w->currentViewport()) vp->goBackPosition();
+    });
+
+    // ----- layout / sidebars / launcher (MAC.5, Global) -----
+    wire("navigation.launcher", [](MainWindow* w){ w->toggleLauncher(); });
+    wire("view.left_sidebar", [](MainWindow* w){
+        if (w->m_leftSidebar && w->m_navigationBar) {
+            const bool newState = !w->m_leftSidebar->isVisible();
+            w->m_leftSidebar->setVisible(newState);
+            w->m_navigationBar->setLeftSidebarChecked(newState);
+            w->updatePagePanelActionBarVisibility();
+            // Force layout update so canvas container resizes before we
+            // recalculate action bar position.
+            if (auto* cw = w->centralWidget()) {
+                if (auto* lyt = cw->layout()) {
+                    lyt->invalidate();
+                    lyt->activate();
+                }
+            }
+            QApplication::processEvents();
+            w->updateActionBarPosition();
+        }
+    });
+    wire("view.right_sidebar", [](MainWindow* w){
+        if (w->markdownNotesSidebar && w->m_navigationBar) {
+            const bool newState = !w->markdownNotesSidebar->isVisible();
+            w->markdownNotesSidebar->setVisible(newState);
+            w->markdownNotesSidebarVisible = newState;
+            w->m_navigationBar->setRightSidebarChecked(newState);
+        }
+    });
+    wire("view.auto_layout", [](MainWindow* w){ w->toggleAutoLayout(); });
+
+    // ----- pane management (MAC.5, Global) -----
+    wire("view.split_right", [](MainWindow* w){
+        auto* svm = w->m_splitViewManager;
+        if (!svm) return;
+        auto* tm = w->tabManager();
+        if (tm && tm->tabCount() > 1) {
+            svm->splitTab(tm->currentIndex(), svm->activePane());
+        }
+    });
+    wire("view.merge_panes", [](MainWindow* w){
+        if (auto* svm = w->m_splitViewManager; svm && svm->isSplit()) {
+            svm->mergePanes();
+        }
+    });
+    wire("view.focus_left_pane", [](MainWindow* w){
+        if (auto* svm = w->m_splitViewManager) svm->setActivePane(SplitViewManager::Left);
+    });
+    wire("view.focus_right_pane", [](MainWindow* w){
+        if (auto* svm = w->m_splitViewManager; svm && svm->isSplit()) {
+            svm->setActivePane(SplitViewManager::Right);
+        }
+    });
+
+    // ----- fullscreen + debug overlay (MAC.5, Global) -----
+    // view.fullscreen's macOS default is Ctrl+Meta+F (= Ctrl+Cmd+F = the Mac
+    // 'Enter Full Screen' convention), set in MAC.1's
+    // ShortcutManager::registerDefaults via setMacosDefault. Nothing more to
+    // do for the Mac rebind here.
+    wire("view.fullscreen",    [](MainWindow* w){ w->toggleFullscreen(); });
+    // view.debug_overlay's wire is unconditional (matching the pre-MAC.5
+    // createShortcut behaviour: shortcut works in any build that ships the
+    // registry id). The macOS *menu item* is the only thing gated on
+    // SPEEDYNOTE_DEBUG, in MacMenuBar::populateViewMenu (per QA Q4.3.a).
+    wire("view.debug_overlay", [](MainWindow* w){ w->toggleDebugOverlay(); });
 }
 
 void MainWindow::setupManagedShortcuts()
@@ -1758,6 +1885,30 @@ void MainWindow::setupManagedShortcuts()
     bindAction("document.add_page");
     bindAction("document.insert_page");
     bindAction("document.delete_page");
+    // MAC.5: zoom + view + page/edgeless navigation + launcher + fullscreen + debug
+    bindAction("zoom.in");
+    bindAction("zoom.in_alt");
+    bindAction("zoom.out");
+    bindAction("zoom.fit");
+    bindAction("zoom.100");
+    bindAction("zoom.fit_width");
+    bindAction("navigation.prev_page");
+    bindAction("navigation.next_page");
+    bindAction("navigation.first_page");
+    bindAction("navigation.last_page");
+    bindAction("navigation.go_to_page");
+    bindAction("edgeless.home");
+    bindAction("edgeless.go_back");
+    bindAction("navigation.launcher");
+    bindAction("view.left_sidebar");
+    bindAction("view.right_sidebar");
+    bindAction("view.auto_layout");
+    bindAction("view.split_right");
+    bindAction("view.merge_panes");
+    bindAction("view.focus_left_pane");
+    bindAction("view.focus_right_pane");
+    bindAction("view.fullscreen");
+    bindAction("view.debug_overlay");
 
     // Helper lambda to create and register a managed shortcut
     auto createShortcut = [this, sm](const QString& actionId, 
@@ -1781,7 +1932,8 @@ void MainWindow::setupManagedShortcuts()
     // wireQActionDispatchers() above and associated to this window via bindAction().
     
     // ===== Navigation =====
-    createShortcut("navigation.launcher", [this]() { toggleLauncher(); });
+    // MAC.5: navigation.launcher is now wired via wireQActionDispatchers()
+    // above and associated to this window via bindAction().
     createShortcut("navigation.escape", [this]() {
         // Only process if no modal dialog is open
         if (QApplication::activeModalWidget()) {
@@ -1812,57 +1964,17 @@ void MainWindow::setupManagedShortcuts()
         // Nothing to cancel in viewport - toggle to launcher
             toggleLauncher();
     }, Qt::WindowShortcut);  // WindowShortcut for Escape
-    createShortcut("navigation.go_to_page", [this]() { showJumpToPageDialog(); });
+    // MAC.5: navigation.go_to_page is now wired via wireQActionDispatchers()
+    // above and associated to this window via bindAction(); the macOS View menu
+    // also surfaces it as 'Go to Page...'.
     // navigation.next_tab, navigation.prev_tab - TODO: implement tab switching
-    // navigation.prev_page, navigation.next_page - handled in DocumentViewport
     
     // ===== View =====
-    createShortcut("view.debug_overlay", [this]() { toggleDebugOverlay(); });
-    createShortcut("view.auto_layout", [this]() { toggleAutoLayout(); });
-    createShortcut("view.fullscreen", [this]() { toggleFullscreen(); });
-    createShortcut("view.left_sidebar", [this]() {
-        if (m_leftSidebar && m_navigationBar) {
-            bool newState = !m_leftSidebar->isVisible();
-            m_leftSidebar->setVisible(newState);
-            m_navigationBar->setLeftSidebarChecked(newState);
-            updatePagePanelActionBarVisibility();
-            
-            // Force layout update so canvas container resizes before we
-            // recalculate action bar position
-            if (centralWidget() && centralWidget()->layout()) {
-                centralWidget()->layout()->invalidate();
-                centralWidget()->layout()->activate();
-            }
-            QApplication::processEvents();
-            updateActionBarPosition();
-        }
-    });
-    createShortcut("view.right_sidebar", [this]() {
-        if (markdownNotesSidebar && m_navigationBar) {
-            bool newState = !markdownNotesSidebar->isVisible();
-            markdownNotesSidebar->setVisible(newState);
-            markdownNotesSidebarVisible = newState;
-            m_navigationBar->setRightSidebarChecked(newState);
-        }
-    });
-    createShortcut("view.split_right", [this]() {
-        if (m_splitViewManager && tabManager() && tabManager()->tabCount() > 1) {
-            m_splitViewManager->splitTab(tabManager()->currentIndex(),
-                                         m_splitViewManager->activePane());
-        }
-    });
-    createShortcut("view.merge_panes", [this]() {
-        if (m_splitViewManager && m_splitViewManager->isSplit()) {
-            m_splitViewManager->mergePanes();
-        }
-    });
-    createShortcut("view.focus_left_pane", [this]() {
-        if (m_splitViewManager) m_splitViewManager->setActivePane(SplitViewManager::Left);
-    });
-    createShortcut("view.focus_right_pane", [this]() {
-        if (m_splitViewManager && m_splitViewManager->isSplit())
-            m_splitViewManager->setActivePane(SplitViewManager::Right);
-    });
+    // MAC.5: view.debug_overlay / view.auto_layout / view.fullscreen /
+    // view.left_sidebar / view.right_sidebar / view.split_right /
+    // view.merge_panes / view.focus_left_pane / view.focus_right_pane are now
+    // wired via wireQActionDispatchers() above and associated to this window
+    // via bindAction(). The macOS View menu surfaces them as well.
     
     // ===== Application =====
     // MAC.3: app.settings and app.keyboard_shortcuts are wired via
@@ -1943,67 +2055,21 @@ void MainWindow::setupManagedShortcuts()
     // MAC.4: edit.undo / edit.redo / edit.redo_alt are now wired via
     // wireQActionDispatchers() above and associated to this window via bindAction().
     
-    // ===== Home Key (context-dependent: edgeless origin OR first page) =====
-    // Note: edgeless.home and navigation.first_page share the same "Home" key
-    // We only create ONE QShortcut to avoid Qt ambiguity, and dispatch based on document type
-    createShortcut("edgeless.home", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->document()) {
-                if (vp->document()->isEdgeless()) {
-                    vp->returnToOrigin();
-                } else {
-                    // Paged document: Home = first page
-                    vp->scrollToPage(0);
-                }
-            }
-        }
-    });
-    // Note: navigation.first_page is NOT created separately - handled by edgeless.home above
-    
-    createShortcut("edgeless.go_back", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->document() && vp->document()->isEdgeless()) {
-                // Edgeless: Backspace navigates back in position history
-                vp->goBackPosition();
-            } else {
-                // Paged: Backspace acts as delete (same as Delete key)
-                vp->handleDeleteAction();
-            }
-        }
-    });
+    // ===== Home Key + Backspace (edgeless / paged split via scope) =====
+    // MAC.5: edgeless.home (EdgelessOnly) and navigation.first_page (PagedOnly)
+    // are now two separate scope-disjoint wires in wireQActionDispatchers().
+    // They both share the Home key, but ShortcutManager::setActiveDocumentScope()
+    // disables whichever doesn't apply to the active document, so Qt's shortcut
+    // router never sees an ambiguous overload. Same pattern for edgeless.go_back
+    // (EdgelessOnly Backspace -> goBackPosition); the pre-MAC.5 paged-doc
+    // Backspace-as-Delete fallback was intentionally dropped (use Delete key
+    // / edit.delete on paged docs instead). Both ids are bindAction'd below.
     
     // ===== Page Navigation (paged documents only) =====
-    createShortcut("navigation.prev_page", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->document() && !vp->document()->isEdgeless()) {
-                int current = vp->currentPageIndex();
-                if (current > 0) {
-                    vp->scrollToPage(current - 1);
-                }
-            }
-        }
-    });
-    createShortcut("navigation.next_page", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->document() && !vp->document()->isEdgeless()) {
-                int current = vp->currentPageIndex();
-                int lastPage = vp->document()->pageCount() - 1;
-                if (current < lastPage) {
-                    vp->scrollToPage(current + 1);
-                }
-            }
-        }
-    });
-    // navigation.first_page is handled by edgeless.home (same "Home" key, context-dependent)
-    
-    createShortcut("navigation.last_page", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->document() && !vp->document()->isEdgeless()) {
-                int lastPage = vp->document()->pageCount() - 1;
-                vp->scrollToPage(lastPage);
-            }
-        }
-    });
+    // MAC.5: navigation.prev_page / next_page / first_page / last_page are now
+    // wired via wireQActionDispatchers() above (navigation.first_page is a
+    // brand-new wire that splits the Home key out of the old edgeless.home
+    // dispatch). All four are PagedOnly and bindAction'd below.
     
     // ===== Tab Navigation =====
     createShortcut("navigation.next_tab", [this]() {
@@ -2019,36 +2085,11 @@ void MainWindow::setupManagedShortcuts()
     // MAC.3: file.close_tab is wired via wireQActionDispatchers() above.
 
     // ===== Zoom Shortcuts =====
-    createShortcut("zoom.in", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            vp->zoomIn();
-        }
-    });
-    createShortcut("zoom.in_alt", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            vp->zoomIn();
-        }
-    });
-    createShortcut("zoom.out", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            vp->zoomOut();
-        }
-    });
-    createShortcut("zoom.fit", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            vp->zoomToFit();
-        }
-    });
-    createShortcut("zoom.100", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            vp->zoomToActualSize();
-        }
-    });
-    createShortcut("zoom.fit_width", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            vp->zoomToWidth();
-        }
-    });
+    // MAC.5: zoom.in / zoom.in_alt / zoom.out / zoom.fit / zoom.100 /
+    // zoom.fit_width are now wired via wireQActionDispatchers() above and
+    // associated to this window via bindAction(). The macOS View menu shows
+    // zoom.in (the primary, displays as Cmd+Shift+=); zoom.in_alt (Cmd+=)
+    // is intentionally not in the menu, alt binding only.
     
     // ===== Layer Operations =====
     createShortcut("layer.new", [this]() {

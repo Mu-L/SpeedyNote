@@ -69,6 +69,7 @@ MacMenuBar::MacMenuBar(QObject* parent) : QObject(parent)
     populateHelpMenu();      // MAC.3
     populateEditMenu();      // MAC.4
     populateDocumentMenu();  // MAC.4
+    populateViewMenu();      // MAC.5
 }
 
 // ============================================================================
@@ -275,6 +276,78 @@ void MacMenuBar::populateDocumentMenu()
 
     // Per QA Q4.4: navigation.go_to_page lives in the View menu (MAC.5),
     // not duplicated here.
+}
+
+// ============================================================================
+// MAC.5: View menu — Zoom + page nav + edgeless nav + layout + panes + fullscreen
+// ============================================================================
+
+void MacMenuBar::populateViewMenu()
+{
+    auto* sm = ShortcutManager::instance();
+    auto add = [sm](QMenu* menu, const QString& id) {
+        if (auto* a = sm->action(id)) menu->addAction(a);
+    };
+
+    // Group 1: Zoom
+    // zoom.in_alt (Cmd+=) is intentionally omitted — it is the convenience
+    // alternate binding only; the menu surfaces zoom.in (displays as Cmd+
+    // / Cmd+Shift+=). Same convention as MAC.4 omitted edit.redo_alt.
+    add(m_viewMenu, "zoom.in");
+    add(m_viewMenu, "zoom.out");
+    add(m_viewMenu, "zoom.fit");
+    add(m_viewMenu, "zoom.100");
+    add(m_viewMenu, "zoom.fit_width");
+    m_viewMenu->addSeparator();
+
+    // Group 2: Page navigation (PagedOnly — auto-greys on edgeless tab via
+    // ShortcutManager::setActiveDocumentScope())
+    add(m_viewMenu, "navigation.prev_page");
+    add(m_viewMenu, "navigation.next_page");
+    add(m_viewMenu, "navigation.first_page");
+    add(m_viewMenu, "navigation.last_page");
+    add(m_viewMenu, "navigation.go_to_page");
+    m_viewMenu->addSeparator();
+
+    // Group 3: Edgeless navigation (EdgelessOnly — auto-greys on paged tab)
+    // 'Return to Origin' (Home) and 'Go Back' (Backspace). Note that the Home
+    // key is shared with navigation.first_page above, but scope enforcement
+    // means only one of the two QActions is enabled at any given moment, so
+    // Qt's shortcut router never reports an ambiguous overload.
+    add(m_viewMenu, "edgeless.home");
+    add(m_viewMenu, "edgeless.go_back");
+    m_viewMenu->addSeparator();
+
+    // Group 4: Layout / sidebars / launcher
+    add(m_viewMenu, "navigation.launcher");
+    add(m_viewMenu, "view.left_sidebar");
+    add(m_viewMenu, "view.right_sidebar");
+    add(m_viewMenu, "view.auto_layout");
+    m_viewMenu->addSeparator();
+
+    // Group 5: Pane management
+    add(m_viewMenu, "view.split_right");
+    add(m_viewMenu, "view.merge_panes");
+    add(m_viewMenu, "view.focus_left_pane");
+    add(m_viewMenu, "view.focus_right_pane");
+    m_viewMenu->addSeparator();
+
+    // Group 6: Fullscreen
+    // The macOS-specific Ctrl+Cmd+F default for view.fullscreen was registered
+    // in MAC.1 via ShortcutManager::setMacosDefault; nothing platform-specific
+    // to do here. The action's text follows the registry's displayName
+    // ("Toggle Fullscreen"); macOS conventions normally label this 'Enter Full
+    // Screen' / 'Exit Full Screen' depending on state, but tracking that
+    // toggle live would require a state-sync wire and isn't in MAC.5 scope.
+    add(m_viewMenu, "view.fullscreen");
+
+#ifdef SPEEDYNOTE_DEBUG
+    // Per QA Q4.3.a: debug overlay is hidden from the menu in release builds.
+    // The keyboard shortcut (F12) is wired unconditionally in
+    // wireQActionDispatchers() so it works in any build that ships the id.
+    m_viewMenu->addSeparator();
+    add(m_viewMenu, "view.debug_overlay");
+#endif
 }
 
 #endif // Q_OS_MACOS
