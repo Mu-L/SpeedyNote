@@ -2,6 +2,49 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="de_DE">
 <context>
+    <name>AboutDialog</name>
+    <message>
+        <location filename="../../source/macos/AboutDialog.cpp" line="20"/>
+        <source>About SpeedyNote</source>
+        <translation>Über SpeedyNote</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/AboutDialog.cpp" line="51"/>
+        <source>SpeedyNote</source>
+        <translation type="unfinished">SpeedyNote</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/AboutDialog.cpp" line="58"/>
+        <source>Version %1</source>
+        <translation type="unfinished">Version %1</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/AboutDialog.cpp" line="66"/>
+        <source>A fast and intuitive note-taking application with PDF annotation support</source>
+        <translation type="unfinished">Eine schnelle und intuitive Notiz-App mit Unterstützung für PDF-Anmerkungen</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/AboutDialog.cpp" line="76"/>
+        <source>Developed by GitHub @alpha-liu-01 and various contributors</source>
+        <translation type="unfinished">Entwickelt von GitHub @alpha-liu-01 und verschiedenen Mitwirkenden</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/AboutDialog.cpp" line="85"/>
+        <source>© 2026 SpeedyNote. All rights reserved.</source>
+        <translation type="unfinished">© 2026 SpeedyNote. Alle Rechte vorbehalten.</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/AboutDialog.cpp" line="92"/>
+        <source>Built with Qt %1</source>
+        <translation type="unfinished">Erstellt mit Qt %1</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/AboutDialog.cpp" line="101"/>
+        <source>Close</source>
+        <translation>Schließen</translation>
+    </message>
+</context>
+<context>
     <name>BatchImportDialog</name>
     <message>
         <location filename="../../source/ui/dialogs/BatchImportDialog.cpp" line="33"/>
@@ -1103,233 +1146,233 @@ HINWEIS: Auf Android werden importierte Notizbücher automatisch zur Bibliothek 
 <context>
     <name>ControlPanelDialog</name>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="174"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="184"/>
         <source>Apply</source>
         <translation>Anwenden</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="175"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="185"/>
         <source>OK</source>
         <translation>OK</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="176"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="186"/>
         <source>Cancel</source>
         <translation>Abbrechen</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="995"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1005"/>
         <source>Background Style:</source>
         <translation>Hintergrundstil:</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1001"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1011"/>
         <source>None</source>
         <translation>Keiner</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1002"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1012"/>
         <source>Grid</source>
         <translation>Gitter</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1003"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1013"/>
         <source>Lines</source>
         <translation>Linien</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1011"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1021"/>
         <source>Background Color:</source>
         <translation>Hintergrundfarbe:</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1455"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1465"/>
         <source>Select Background Color</source>
         <translation>Hintergrundfarbe auswählen</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1475"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1485"/>
         <source>Use Custom Accent Color</source>
         <translation>Benutzerdefinierte Akzentfarbe verwenden</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1478"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1488"/>
         <source>Accent Color:</source>
         <translation>Akzentfarbe:</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1489"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1499"/>
         <source>When enabled, use a custom accent color instead of the system accent color for the toolbar, dial, and tab selection.</source>
         <translation>Wenn aktiviert, wird eine benutzerdefinierte Akzentfarbe anstelle der System-Akzentfarbe für die Symbolleiste, das Einstellrad und die Registerkartenauswahl verwendet.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1536"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1546"/>
         <source>Theme</source>
         <translation>Design</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1540"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1550"/>
         <source>Select Accent Color</source>
         <translation>Akzentfarbe auswählen</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="150"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="160"/>
         <source>Settings</source>
         <translation>Einstellungen</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="204"/>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1230"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="214"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1240"/>
         <source>Shortcuts</source>
         <translation>Tastenkürzel</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1025"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1035"/>
         <source>Grid/Line Color:</source>
         <translation>Gitter-/Linienfarbe:</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1041"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1051"/>
         <source>Grid Spacing:</source>
         <translation>Gitterabstand:</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1056"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1066"/>
         <source>Line Spacing:</source>
         <translation>Linienabstand:</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1070"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1080"/>
         <source>Note: 32px spacing is recommended as it divides evenly into the 1024px tile size used by the edgeless canvas.</source>
         <translation>Hinweis: Ein Abstand von 32px wird empfohlen, da er gleichmäßig in die 1024px-Kachelgröße der unbegrenzten Arbeitsfläche unterteilt werden kann.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1085"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1095"/>
         <source>Page</source>
         <translation>Seite</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1110"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1120"/>
         <source> px</source>
         <translation>px</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1103"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1113"/>
         <source>Panning</source>
         <translation>Schwenken</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1113"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1123"/>
         <source>Mouse wheel scroll speed:</source>
         <translation>Mausrad-Scrollgeschwindigkeit:</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1116"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1126"/>
         <source>Distance the viewport moves per mouse wheel click, in document units. Applies to vertical panning (wheel / `+wheel) and horizontal panning (Shift+wheel). Does not affect touchpad scrolling.</source>
         <translation>Distanz, um die sich der Ansichtsbereich pro Mausradklick bewegt, in Dokumenteinheiten. Gilt für vertikales Schwenken (Rad / `+Rad) und horizontales Schwenken (Shift+Rad). Beeinflusst nicht das Scrollen per Touchpad.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1127"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1137"/>
         <source>OCR (Handwriting Recognition)</source>
         <translation>OCR (Handschrifterkennung)</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1130"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1140"/>
         <source>CJK grid-cell mode (box-by-box character detection)</source>
         <translation>CJK-Gitterzellenmodus (zeichenweise Erkennung)</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1135"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1145"/>
         <source>When &quot;Snap OCR to Grid/Lines&quot; is enabled on the OCR toolbar and the background is a grid, this option makes each grid cell detect one CJK character. Adjacent characters are merged into sentences. Leave unchecked for line-based detection (suitable for most languages).</source>
         <translation>Wenn „OCR an Gitter/Linien ausrichten“ in der OCR-Symbolleiste aktiviert ist und der Hintergrund ein Gitter ist, sorgt diese Option dafür, dass jede Gitterzelle ein CJK-Zeichen erkennt. Benachbarte Zeichen werden zu Sätzen zusammengefügt. Deaktiviert lassen für zeilenbasierte Erkennung (geeignet für die meisten Sprachen).</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1147"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1157"/>
         <source>Tools</source>
         <translation>Werkzeuge</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1163"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1173"/>
         <source>Keyboard Shortcuts</source>
         <translation>Tastenkürzel</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1167"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1177"/>
         <source>Double-click a shortcut to edit. Changes are saved automatically.</source>
         <translation>Doppelklicken Sie auf ein Kürzel, um es zu bearbeiten. Änderungen werden automatisch gespeichert.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1174"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1184"/>
         <source>Action</source>
         <translation>Aktion</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1174"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1184"/>
         <source>Shortcut</source>
         <translation>Tastenkombination</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1174"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1184"/>
         <source>Default</source>
         <translation>Standard</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1195"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1205"/>
         <source>Edit</source>
         <translation>Bearbeiten</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1196"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1206"/>
         <source>Edit the selected shortcut</source>
         <translation>Die ausgewählte Tastenkombination bearbeiten</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1200"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1210"/>
         <source>Reset</source>
         <translation>Zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1201"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1211"/>
         <source>Reset the selected shortcut to default</source>
         <translation>Die ausgewählte Tastenkombination auf Standard zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1207"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1217"/>
         <source>Reset All to Defaults</source>
         <translation>Alle auf Standard zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1208"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1218"/>
         <source>Reset all shortcuts to their default values</source>
         <translation>Alle Tastenkombinationen auf ihre Standardwerte zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1219"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1229"/>
         <source>Open Config Folder</source>
         <translation>Konfigurationsordner öffnen</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1220"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1230"/>
         <source>Open the folder containing shortcuts.json</source>
         <translation>Den Ordner öffnen, der die shortcuts.json enthält</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1306"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1316"/>
         <source>Conflict with: %1</source>
         <translation>Konflikt mit: %1</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1323"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1333"/>
         <source>Capture Shortcut for: %1</source>
         <translation>Tastenkombination für %1 erfassen</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1341"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1351"/>
         <source>Shortcut Conflict</source>
         <translation>Tastenkombinationskonflikt</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1342"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1352"/>
         <source>The shortcut &apos;%1&apos; is already used by:
 %2
 
@@ -1340,38 +1383,38 @@ Do you want to use it anyway?</source>
 Möchten Sie sie trotzdem verwenden?</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1370"/>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1379"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1380"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1389"/>
         <source>No Selection</source>
         <translation>Keine Auswahl</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1371"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1381"/>
         <source>Please select a shortcut to edit.</source>
         <translation>Bitte wählen Sie eine Tastenkombination zum Bearbeiten aus.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1380"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1390"/>
         <source>Please select a shortcut to reset.</source>
         <translation>Bitte wählen Sie eine Tastenkombination zum Zurücksetzen aus.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1390"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1400"/>
         <source>Already Default</source>
         <translation>Bereits Standard</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1391"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1401"/>
         <source>This shortcut is already using the default value.</source>
         <translation>Diese Tastenkombination verwendet bereits den Standardwert.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1406"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1416"/>
         <source>Reset All Shortcuts</source>
         <translation>Alle Tastenkombinationen zurücksetzen</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1407"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1417"/>
         <source>Are you sure you want to reset all shortcuts to their default values?
 
 This cannot be undone.</source>
@@ -1380,137 +1423,137 @@ This cannot be undone.</source>
 Dies kann nicht rückgängig gemacht werden.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1421"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1431"/>
         <source>Shortcuts Reset</source>
         <translation>Tastenkombinationen zurückgesetzt</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1422"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1432"/>
         <source>All shortcuts have been reset to their default values.</source>
         <translation>Alle Tastenkombinationen wurden auf ihre Standardwerte zurückgesetzt.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1449"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1459"/>
         <source>%1 × %2 px (at 96 DPI)</source>
         <translation>%1 × %2 px (bei 96 DPI)</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1463"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1473"/>
         <source>Select Grid/Line Color</source>
         <translation>Raster-/Linienfarbe auswählen</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1502"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1512"/>
         <source>Invert PDF Lightness in Dark Mode</source>
         <translation>PDF-Helligkeit im Dunkelmodus umkehren</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1505"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1515"/>
         <source>When enabled and dark mode is active, PDF page backgrounds are darkened by inverting lightness (HSL). White pages become dark and dark text becomes light, while colours keep their hue. Disable this if you prefer the original PDF colours.</source>
         <translation>Wenn aktiviert und der Dunkelmodus aktiv ist, werden PDF-Seitenhintergründe durch Umkehrung der Helligkeit (HSL) abgedunkelt. Weiße Seiten werden dunkel und dunkler Text wird hell, während die Farben ihren Farbton beibehalten. Deaktivieren Sie dies, wenn Sie die ursprünglichen PDF-Farben bevorzugen.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1516"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1526"/>
         <source>Invert entire page including images</source>
         <translation>Gesamte Seite einschließlich Bilder umkehren</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1519"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1529"/>
         <source>By default, embedded photos and figures are detected and excluded from inversion. Enable this to invert every pixel on the page. Useful for PDFs that consist mainly of black-and-white diagrams or graphs.</source>
         <translation>Standardmäßig werden eingebettete Fotos und Grafiken erkannt und von der Umkehrung ausgeschlossen. Aktivieren Sie dies, um jedes Pixel auf der Seite umzukehren. Nützlich für PDFs, die hauptsächlich aus Schwarz-Weiß-Diagrammen oder Grafiken bestehen.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1627"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1637"/>
         <source>Configure physical controller button mappings for your Joy-Con or other controller:</source>
         <translation>Physische Controller-Tastenbelegungen für Ihr Joy-Con oder einen anderen Controller konfigurieren:</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1631"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1641"/>
         <source>Note: This maps your physical controller buttons to the logical Joy-Con functions used by the application. After setting up the physical mapping, you can configure what actions each logical button performs in the &apos;Button Mapping&apos; tab.</source>
         <translation>Hinweis: Dies ordnet Ihre physischen Controller-Tasten den logischen Joy-Con-Funktionen zu, die von der Anwendung verwendet werden. Nach dem Einrichten der physischen Zuordnung können Sie im Tab „Tastenbelegung“ konfigurieren, welche Aktionen jede logische Taste ausführt.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1638"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1648"/>
         <source>Configure Controller Mapping</source>
         <translation>Controller-Belegung konfigurieren</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1644"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1654"/>
         <source>Reconnect Controller</source>
         <translation>Controller erneut verbinden</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1651"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1661"/>
         <source>Current controller status:</source>
         <translation>Aktueller Controller-Status:</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1697"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1707"/>
         <source>Controller manager is not available.</source>
         <translation>Controller-Manager ist nicht verfügbar.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1702"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1712"/>
         <source>🔄 Reconnecting...</source>
         <translation>🔄 Verbinde erneut...</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1719"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1729"/>
         <source>Reconnection Successful</source>
         <translation>Wiederverbindung erfolgreich</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1720"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1730"/>
         <source>Controller has been successfully reconnected!</source>
         <translation>Controller wurde erfolgreich erneut verbunden!</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1722"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1732"/>
         <source>Reconnection Failed</source>
         <translation>Wiederverbindung fehlgeschlagen</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1723"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1733"/>
         <source>Failed to reconnect controller. Please ensure your controller is powered on and in pairing mode, then try again.</source>
         <translation>Controller konnte nicht erneut verbunden werden. Bitte stellen Sie sicher, dass Ihr Controller eingeschaltet ist und sich im Kopplungsmodus befindet, und versuchen Sie es dann erneut.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1732"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1742"/>
         <source>✗ Controller manager not available</source>
         <translation>✗ Controller-Manager nicht verfügbar</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1738"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1748"/>
         <source>✓ Controller connected</source>
         <translation>✓ Controller verbunden</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1741"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1751"/>
         <source>✗ No controller detected</source>
         <translation>✗ Kein Controller erkannt</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1781"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1791"/>
         <source>SpeedyNote</source>
         <translation>SpeedyNote</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1789"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1799"/>
         <source>Version %1</source>
         <translation>Version %1</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1814"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1824"/>
         <source>© 2026 SpeedyNote. All rights reserved.</source>
         <translation>© 2026 SpeedyNote. Alle Rechte vorbehalten.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1841"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1851"/>
         <source>Cache Management</source>
         <translation>Cache-Verwaltung</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1850"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1860"/>
         <source>SpeedyNote uses temporary folders to work with notebook files.
 These folders are normally cleaned up when you close a notebook,
 but crashes or force-close can leave orphaned files behind.</source>
@@ -1519,28 +1562,28 @@ Diese Ordner werden normalerweise beim Schließen eines Notizbuchs bereinigt,
 aber Abstürze oder erzwungenes Schließen können verwaiste Dateien hinterlassen.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1866"/>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1907"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1876"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1917"/>
         <source>Current cache size: %1</source>
         <translation>Aktuelle Cache-Größe: %1</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1875"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1885"/>
         <source>Location: %1</source>
         <translation>Speicherort: %1</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1884"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1894"/>
         <source>Clear Cache Now</source>
         <translation>Cache jetzt leeren</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1892"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1902"/>
         <source>Clear Cache?</source>
         <translation>Cache leeren?</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1893"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1903"/>
         <source>This will delete all temporary cache files.
 
 ⚠️ WARNING: Make sure all notebooks are closed before clearing cache, otherwise you may lose unsaved changes!
@@ -1553,102 +1596,102 @@ Continue?</source>
 Fortfahren?</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1910"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1920"/>
         <source>Cache Cleared</source>
         <translation>Cache geleert</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1911"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1921"/>
         <source>Cache cleanup is temporarily disabled during architecture migration.</source>
         <translation>Die Cache-Bereinigung ist während der Architekturmigration vorübergehend deaktiviert.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1925"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1935"/>
         <source>⚠️ Only clear cache when all notebooks are closed</source>
         <translation>⚠️ Cache nur leeren, wenn alle Notizbücher geschlossen sind</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1935"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1945"/>
         <source>Cache</source>
         <translation>Cache</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1947"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1957"/>
         <source>Language Settings</source>
         <translation>Spracheinstellungen</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1954"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1964"/>
         <source>Use System Language (Auto-detect)</source>
         <translation>Systemsprache verwenden (automatisch erkennen)</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1957"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1967"/>
         <source>When enabled, SpeedyNote will automatically detect and use your system&apos;s language setting.</source>
         <translation>Wenn aktiviert, erkennt SpeedyNote automatisch Ihre Systemeinstellung für die Sprache und verwendet diese.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1963"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1973"/>
         <source>Manual Language Override:</source>
         <translation>Manuelle Sprachauswahl:</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1996"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="2015"/>
         <source>Unknown</source>
         <translation type="unfinished">Unbekannt</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1981"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="2000"/>
         <source>Select a specific language to override the system setting. Changes take effect after restarting the application.</source>
         <translation>Wählen Sie eine bestimmte Sprache, um die Systemeinstellung zu überschreiben. Änderungen werden nach einem Neustart der Anwendung wirksam.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1987"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="2006"/>
         <source>Current Language Status:</source>
         <translation>Aktueller Sprachstatus:</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1999"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="2018"/>
         <source>System Language: %1 (%2)</source>
         <translation>Systemsprache: %1 (%2)</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="2024"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="2030"/>
         <source>Handwriting Recognition Language</source>
         <translation>Sprache für Handschrifterkennung</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="2031"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="2037"/>
         <source>Default language for OCR handwriting recognition. Individual documents can override this in the overflow menu.</source>
         <translation>Standardsprache für die OCR-Handschrifterkennung. Einzelne Dokumente können dies über das Überlaufmenü überschreiben.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="2038"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="2044"/>
         <source>Auto-detect (system default)</source>
         <translation>Automatisch erkennen (Systemstandard)</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="2057"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="2063"/>
         <source>Language</source>
         <translation>Sprache</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="2069"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="2075"/>
         <source>Palm Rejection</source>
         <translation>Handballenerkennung</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="2073"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="2079"/>
         <source>Disable touch gestures when stylus is active</source>
         <translation>Berührungsgesten bei aktivem Eingabestift deaktivieren</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="2079"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="2085"/>
         <source>Restore delay:</source>
         <translation>Wiederherstellungsverzögerung:</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="2092"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="2098"/>
         <source>When enabled, touch gestures are temporarily disabled while the stylus is hovering or touching the screen. After the stylus leaves, touch gestures are restored after the specified delay.
 
 This helps prevent accidental palm touches while writing. Only affects Y-Axis Only and Full touch gesture modes.</source>
@@ -1657,135 +1700,135 @@ This helps prevent accidental palm touches while writing. Only affects Y-Axis On
 Dies hilft, versehentliche Berührungen durch den Handballen während des Schreibens zu vermeiden. Betrifft nur die Gestenmodi „Nur Y-Achse“ und „Vollständig“.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="2114"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="2120"/>
         <source>Stylus</source>
         <translation>Eingabestift</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1797"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1807"/>
         <source>A fast and intuitive note-taking application with PDF annotation support</source>
         <translation>Eine schnelle und intuitive Notiz-App mit Unterstützung für PDF-Anmerkungen</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1806"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1816"/>
         <source>Developed by GitHub @alpha-liu-01 and various contributors</source>
         <translation>Entwickelt von GitHub @alpha-liu-01 und verschiedenen Mitwirkenden</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1823"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1833"/>
         <source>Built with Qt %1</source>
         <translation>Erstellt mit Qt %1</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1830"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1840"/>
         <source>About</source>
         <translation>Über</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1662"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1672"/>
         <source>Controller Mapping</source>
         <translation>Controller-Belegung</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="934"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="944"/>
         <source>Default Page &amp; Background Settings</source>
         <translation>Standard-Seiten- &amp; Hintergrundeinstellungen</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="938"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="948"/>
         <source>These settings apply to newly created documents only. Background changes will also be applied to the current document.</source>
         <translation>Diese Einstellungen gelten nur für neu erstellte Dokumente. Hintergrundänderungen werden auch auf das aktuelle Dokument angewendet.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="945"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="955"/>
         <source>Default Page Size</source>
         <translation>Standard-Seitengröße</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="951"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="961"/>
         <source>Paper Size:</source>
         <translation>Papierformat:</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="959"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="969"/>
         <source>A3 (297 × 420 mm)</source>
         <translation>A3 (297 × 420 mm)</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="960"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="970"/>
         <source>B4 (250 × 353 mm)</source>
         <translation>B4 (250 × 353 mm)</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="961"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="971"/>
         <source>A4 (210 × 297 mm)</source>
         <translation>A4 (210 × 297 mm)</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="962"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="972"/>
         <source>B5 (176 × 250 mm)</source>
         <translation>B5 (176 × 250 mm)</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="963"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="973"/>
         <source>A5 (148 × 210 mm)</source>
         <translation>A5 (148 × 210 mm)</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="965"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="975"/>
         <source>US Letter (8.5 × 11 in)</source>
         <translation>US Letter (8,5 × 11 Zoll)</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="966"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="976"/>
         <source>US Legal (8.5 × 14 in)</source>
         <translation>US Legal (8,5 × 14 Zoll)</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="967"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="977"/>
         <source>US Tabloid (11 × 17 in)</source>
         <translation>US Tabloid (11 × 17 Zoll)</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="976"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="986"/>
         <source>Dimensions:</source>
         <translation>Abmessungen:</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="989"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="999"/>
         <source>Default Background</source>
         <translation>Standard-Hintergrund</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1667"/>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1690"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1677"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1700"/>
         <source>Error</source>
         <translation>Fehler</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1667"/>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1690"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1677"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1700"/>
         <source>MainWindow reference not available.</source>
         <translation>Referenz zum Hauptfenster nicht verfügbar.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1673"/>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1696"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1683"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1706"/>
         <source>Controller Not Available</source>
         <translation>Controller nicht verfügbar</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1674"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1684"/>
         <source>Controller manager is not available. Please ensure a controller is connected and restart the application.</source>
         <translation>Der Controller-Manager ist nicht verfügbar. Bitte stellen Sie sicher, dass ein Controller angeschlossen ist, und starten Sie die Anwendung neu.</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1679"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1689"/>
         <source>No Controller Detected</source>
         <translation>Kein Controller erkannt</translation>
     </message>
     <message>
-        <location filename="../../source/ControlPanelDialog.cpp" line="1680"/>
+        <location filename="../../source/ControlPanelDialog.cpp" line="1690"/>
         <source>No controller is currently connected. Please connect your controller and restart the application.</source>
         <translation>Es ist derzeit kein Controller angeschlossen. Bitte schließen Sie Ihren Controller an und starten Sie die Anwendung neu.</translation>
     </message>
@@ -2138,7 +2181,7 @@ Fehlerausgabe:
         <translation>Radierer-Größenvorgabe %1 (klicken zum Auswählen, erneut klicken zum Bearbeiten)</translation>
     </message>
     <message>
-        <location filename="../../source/ui/subtoolbars/EraserSubToolbar.cpp" line="212"/>
+        <location filename="../../source/ui/subtoolbars/EraserSubToolbar.cpp" line="230"/>
         <source>Edit Eraser Size</source>
         <translation>Radierer-Größe bearbeiten</translation>
     </message>
@@ -2452,7 +2495,7 @@ Fehlerausgabe:
         <translation>OCR-Textauswahl (klicken, um zu PDF-Text zu wechseln)</translation>
     </message>
     <message>
-        <location filename="../../source/ui/subtoolbars/HighlighterSubToolbar.cpp" line="269"/>
+        <location filename="../../source/ui/subtoolbars/HighlighterSubToolbar.cpp" line="289"/>
         <source>Select Highlighter Color</source>
         <translation>Textmarkerfarbe auswählen</translation>
     </message>
@@ -2973,183 +3016,275 @@ Diese Aktion kann nicht rückgängig gemacht werden.</translation>
     </message>
 </context>
 <context>
+    <name>MacMenuBar</name>
+    <message>
+        <location filename="../../source/macos/MacMenuBar.cpp" line="57"/>
+        <source>&amp;File</source>
+        <translation>&amp;Datei</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/MacMenuBar.cpp" line="58"/>
+        <source>&amp;Edit</source>
+        <translation>&amp;Bearbeiten</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/MacMenuBar.cpp" line="59"/>
+        <source>&amp;View</source>
+        <translation>&amp;Ansicht</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/MacMenuBar.cpp" line="60"/>
+        <source>&amp;Document</source>
+        <translation>&amp;Dokument</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/MacMenuBar.cpp" line="61"/>
+        <source>&amp;Tools</source>
+        <translation>&amp;Extras</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/MacMenuBar.cpp" line="62"/>
+        <source>&amp;OCR</source>
+        <translation>&amp;OCR</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/MacMenuBar.cpp" line="63"/>
+        <source>&amp;Window</source>
+        <translation>&amp;Fenster</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/MacMenuBar.cpp" line="64"/>
+        <source>&amp;Help</source>
+        <translation>&amp;Hilfe</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/MacMenuBar.cpp" line="88"/>
+        <source>About SpeedyNote</source>
+        <translation>Über SpeedyNote</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/MacMenuBar.cpp" line="160"/>
+        <source>Relink PDF...</source>
+        <translation type="unfinished">PDF neu verknüpfen...</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/MacMenuBar.cpp" line="193"/>
+        <source>Visit GitHub</source>
+        <translation>GitHub besuchen</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/MacMenuBar.cpp" line="198"/>
+        <source>Report a Bug...</source>
+        <translation>Fehler melden...</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/MacMenuBar.cpp" line="371"/>
+        <source>Highlighter Style</source>
+        <translation>Textmarker-Stil</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/MacMenuBar.cpp" line="383"/>
+        <source>Insert</source>
+        <translation>Einfügen</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/MacMenuBar.cpp" line="393"/>
+        <source>Object</source>
+        <translation>Objekt</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/MacMenuBar.cpp" line="407"/>
+        <source>Layers</source>
+        <translation type="unfinished">Ebenen</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/MacMenuBar.cpp" line="417"/>
+        <source>Links</source>
+        <translation type="unfinished">Links</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/MacMenuBar.cpp" line="456"/>
+        <source>OCR Language...</source>
+        <translation type="unfinished">OCR-Sprache...</translation>
+    </message>
+    <message>
+        <location filename="../../source/macos/MacMenuBar.cpp" line="464"/>
+        <source>Lock All OCR Text</source>
+        <translation type="unfinished">Alle OCR-Texte sperren</translation>
+    </message>
+</context>
+<context>
     <name>MainWindow</name>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="1221"/>
-        <location filename="../../source/MainWindow.cpp" line="1229"/>
-        <location filename="../../source/MainWindow.cpp" line="1254"/>
-        <location filename="../../source/MainWindow.cpp" line="1299"/>
-        <location filename="../../source/MainWindow.cpp" line="3245"/>
+        <location filename="../../source/MainWindow.cpp" line="1235"/>
+        <location filename="../../source/MainWindow.cpp" line="1243"/>
+        <location filename="../../source/MainWindow.cpp" line="1268"/>
+        <location filename="../../source/MainWindow.cpp" line="1313"/>
+        <location filename="../../source/MainWindow.cpp" line="3422"/>
         <source>Export Failed</source>
         <translation>Export fehlgeschlagen</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="1293"/>
-        <location filename="../../source/MainWindow.cpp" line="3237"/>
+        <location filename="../../source/MainWindow.cpp" line="1307"/>
+        <location filename="../../source/MainWindow.cpp" line="3414"/>
         <source>Export Complete</source>
         <translation>Export abgeschlossen</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="400"/>
-        <location filename="../../source/MainWindow.cpp" line="1176"/>
+        <location filename="../../source/MainWindow.cpp" line="6629"/>
         <source>Untitled</source>
         <translation>Unbenannt</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="586"/>
-        <location filename="../../source/MainWindow.cpp" line="8049"/>
+        <location filename="../../source/MainWindow.cpp" line="621"/>
+        <location filename="../../source/MainWindow.cpp" line="8498"/>
         <source>canvas</source>
         <translation>Leinwand</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="586"/>
-        <location filename="../../source/MainWindow.cpp" line="8049"/>
+        <location filename="../../source/MainWindow.cpp" line="621"/>
+        <location filename="../../source/MainWindow.cpp" line="8498"/>
         <source>document</source>
         <translation>Dokument</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="589"/>
-        <location filename="../../source/MainWindow.cpp" line="8052"/>
+        <location filename="../../source/MainWindow.cpp" line="624"/>
+        <location filename="../../source/MainWindow.cpp" line="8501"/>
         <source>Save Changes?</source>
         <translation>Änderungen speichern?</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="590"/>
+        <location filename="../../source/MainWindow.cpp" line="625"/>
         <source>This %1 has unsaved changes. Do you want to save before closing?</source>
         <translation>Dieses %1 enthält ungespeicherte Änderungen. Möchten Sie vor dem Schließen speichern?</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="605"/>
-        <location filename="../../source/MainWindow.cpp" line="3434"/>
-        <location filename="../../source/MainWindow.cpp" line="3520"/>
-        <location filename="../../source/MainWindow.cpp" line="8070"/>
-        <location filename="../../source/MainWindow.cpp" line="8368"/>
+        <location filename="../../source/MainWindow.cpp" line="640"/>
+        <location filename="../../source/MainWindow.cpp" line="3611"/>
+        <location filename="../../source/MainWindow.cpp" line="3697"/>
+        <location filename="../../source/MainWindow.cpp" line="8519"/>
+        <location filename="../../source/MainWindow.cpp" line="8817"/>
         <source>Save Error</source>
         <translation>Speicherfehler</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="606"/>
-        <location filename="../../source/MainWindow.cpp" line="3435"/>
-        <location filename="../../source/MainWindow.cpp" line="3521"/>
+        <location filename="../../source/MainWindow.cpp" line="641"/>
+        <location filename="../../source/MainWindow.cpp" line="3612"/>
+        <location filename="../../source/MainWindow.cpp" line="3698"/>
         <source>Failed to save document to:
 %1</source>
         <translation>Dokument konnte nicht gespeichert werden unter:
 %1</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="1255"/>
-        <location filename="../../source/MainWindow.cpp" line="3194"/>
+        <location filename="../../source/MainWindow.cpp" line="1269"/>
+        <location filename="../../source/MainWindow.cpp" line="3371"/>
         <source>Could not find a unique filename. Please choose a different location.</source>
         <translation>Es konnte kein eindeutiger Dateiname gefunden werden. Bitte wählen Sie einen anderen Speicherort.</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3383"/>
-        <location filename="../../source/MainWindow.cpp" line="3411"/>
+        <location filename="../../source/MainWindow.cpp" line="3560"/>
+        <location filename="../../source/MainWindow.cpp" line="3588"/>
         <source>Save Canvas</source>
         <translation>Leinwand speichern</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3383"/>
-        <location filename="../../source/MainWindow.cpp" line="3411"/>
-        <location filename="../../source/MainWindow.cpp" line="3496"/>
-        <location filename="../../source/MainWindow.cpp" line="3503"/>
+        <location filename="../../source/MainWindow.cpp" line="3560"/>
+        <location filename="../../source/MainWindow.cpp" line="3588"/>
+        <location filename="../../source/MainWindow.cpp" line="3673"/>
+        <location filename="../../source/MainWindow.cpp" line="3680"/>
         <source>Save Document</source>
         <translation>Dokument speichern</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3413"/>
+        <location filename="../../source/MainWindow.cpp" line="3590"/>
         <source>SpeedyNote Bundle (*.snb)</source>
         <translation>SpeedyNote-Paket (*.snb)</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="1042"/>
-        <location filename="../../source/MainWindow.cpp" line="2830"/>
-        <location filename="../../source/MainWindow.cpp" line="3088"/>
+        <location filename="../../source/MainWindow.cpp" line="1081"/>
+        <location filename="../../source/MainWindow.cpp" line="3007"/>
+        <location filename="../../source/MainWindow.cpp" line="3265"/>
         <source>Relink PDF...</source>
         <translation>PDF neu verknüpfen...</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="1099"/>
+        <location filename="../../source/MainWindow.cpp" line="1112"/>
         <source>Jump to Page...</source>
         <translation>Zu Seite springen...</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="1102"/>
+        <location filename="../../source/MainWindow.cpp" line="1116"/>
         <source>Settings</source>
         <translation>Einstellungen</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3497"/>
-        <location filename="../../source/MainWindow.cpp" line="3504"/>
+        <location filename="../../source/MainWindow.cpp" line="3674"/>
+        <location filename="../../source/MainWindow.cpp" line="3681"/>
         <source>No document is open.</source>
         <translation>Es ist kein Dokument geöffnet.</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3636"/>
+        <location filename="../../source/MainWindow.cpp" line="3848"/>
         <source>SpeedyNote Files (*.snb *.pdf);;SpeedyNote Bundle (*.snb);;PDF Documents (*.pdf);;All Files (*)</source>
         <translation>SpeedyNote-Dateien (*.snb *.pdf);;SpeedyNote-Paket (*.snb);;PDF-Dokumente (*.pdf);;Alle Dateien (*)</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3619"/>
-        <location filename="../../source/MainWindow.cpp" line="3639"/>
+        <location filename="../../source/MainWindow.cpp" line="3831"/>
+        <location filename="../../source/MainWindow.cpp" line="3851"/>
         <source>Open Document</source>
         <translation>Dokument öffnen</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="246"/>
-        <source>SpeedyNote %1</source>
-        <translation>SpeedyNote %1</translation>
-    </message>
-    <message>
-        <location filename="../../source/MainWindow.cpp" line="1049"/>
+        <location filename="../../source/MainWindow.cpp" line="1088"/>
         <source>Export to PDF...</source>
         <translation>Als PDF exportieren...</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="1056"/>
+        <location filename="../../source/MainWindow.cpp" line="1099"/>
         <source>OCR Language...</source>
         <translation>OCR-Sprache...</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="1061"/>
+        <location filename="../../source/MainWindow.cpp" line="1105"/>
         <source>Lock All OCR Text</source>
         <translation>Alle OCR-Texte sperren</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="1222"/>
-        <location filename="../../source/MainWindow.cpp" line="3113"/>
-        <location filename="../../source/MainWindow.cpp" line="3120"/>
+        <location filename="../../source/MainWindow.cpp" line="1236"/>
+        <location filename="../../source/MainWindow.cpp" line="3290"/>
+        <location filename="../../source/MainWindow.cpp" line="3297"/>
         <source>No document is currently open.</source>
         <translation>Es ist derzeit kein Dokument geöffnet.</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="1230"/>
-        <location filename="../../source/MainWindow.cpp" line="3128"/>
+        <location filename="../../source/MainWindow.cpp" line="1244"/>
+        <location filename="../../source/MainWindow.cpp" line="3305"/>
         <source>Please save the document before exporting.</source>
         <translation>Bitte speichern Sie das Dokument vor dem Exportieren.</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="1281"/>
+        <location filename="../../source/MainWindow.cpp" line="1295"/>
         <source>Share Notebook Package</source>
         <translation>Notizbuchpaket teilen</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="1286"/>
+        <location filename="../../source/MainWindow.cpp" line="1300"/>
         <source>%1 bytes</source>
         <translation>%1 Bytes</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="1288"/>
+        <location filename="../../source/MainWindow.cpp" line="1302"/>
         <source>%1 KB</source>
         <translation>%1 KB</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="1291"/>
+        <location filename="../../source/MainWindow.cpp" line="1305"/>
         <source>%1 MB</source>
         <translation>%1 MB</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="1294"/>
+        <location filename="../../source/MainWindow.cpp" line="1308"/>
         <source>Notebook exported successfully.
 
 File: %1
@@ -3160,35 +3295,35 @@ Datei: %1
 Größe: %2</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="2770"/>
+        <location filename="../../source/MainWindow.cpp" line="2931"/>
         <source>Warning</source>
         <translation>Warnung</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="2832"/>
-        <location filename="../../source/MainWindow.cpp" line="3090"/>
+        <location filename="../../source/MainWindow.cpp" line="3009"/>
+        <location filename="../../source/MainWindow.cpp" line="3267"/>
         <source>Link PDF...</source>
         <translation>PDF verknüpfen...</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3105"/>
+        <location filename="../../source/MainWindow.cpp" line="3282"/>
         <source>Share as PDF</source>
         <translation>Als PDF teilen</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3107"/>
+        <location filename="../../source/MainWindow.cpp" line="3284"/>
         <source>Export to PDF</source>
         <translation>Als PDF exportieren</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3136"/>
+        <location filename="../../source/MainWindow.cpp" line="3313"/>
         <source>PDF export is only available for paged documents.
 Edgeless canvas export is not yet supported.</source>
         <translation>Der PDF-Export ist nur für paginierte Dokumente verfügbar.
 Der Export von unendlichen Arbeitsflächen wird noch nicht unterstützt.</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3144"/>
+        <location filename="../../source/MainWindow.cpp" line="3321"/>
         <source>The document has unsaved changes.
 Please save the document before sharing as PDF.
 
@@ -3199,7 +3334,7 @@ Bitte speichern Sie das Dokument, bevor Sie es als PDF teilen.
 Möchten Sie jetzt speichern?</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3148"/>
+        <location filename="../../source/MainWindow.cpp" line="3325"/>
         <source>The document has unsaved changes.
 Please save the document before exporting to PDF.
 
@@ -3210,18 +3345,18 @@ Bitte speichern Sie das Dokument, bevor Sie es als PDF exportieren.
 Möchten Sie jetzt speichern?</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3153"/>
+        <location filename="../../source/MainWindow.cpp" line="3330"/>
         <source>Save Document First</source>
         <translation>Dokument zuerst speichern</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3231"/>
-        <location filename="../../source/MainWindow.cpp" line="3234"/>
+        <location filename="../../source/MainWindow.cpp" line="3408"/>
+        <location filename="../../source/MainWindow.cpp" line="3411"/>
         <source>Share PDF</source>
         <translation>PDF teilen</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3238"/>
+        <location filename="../../source/MainWindow.cpp" line="3415"/>
         <source>PDF exported successfully!
 
 Pages exported: %1
@@ -3232,41 +3367,41 @@ Exportierte Seiten: %1
 Dateigröße: %2 KB</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3246"/>
+        <location filename="../../source/MainWindow.cpp" line="3423"/>
         <source>Failed to export PDF:
 %1</source>
         <translation>PDF-Export fehlgeschlagen:
 %1</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3372"/>
+        <location filename="../../source/MainWindow.cpp" line="3549"/>
         <source>Untitled Canvas</source>
         <translation>Unbenannte Arbeitsfläche</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3372"/>
+        <location filename="../../source/MainWindow.cpp" line="3549"/>
         <source>Untitled Document</source>
         <translation>Unbenanntes Dokument</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3394"/>
+        <location filename="../../source/MainWindow.cpp" line="3571"/>
         <source>Overwrite?</source>
         <translation>Überschreiben?</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3395"/>
+        <location filename="../../source/MainWindow.cpp" line="3572"/>
         <source>A document named &apos;%1&apos; already exists.
 Do you want to replace it?</source>
         <translation>Ein Dokument mit dem Namen &apos;%1&apos; existiert bereits.
 Möchten Sie es ersetzen?</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3612"/>
+        <location filename="../../source/MainWindow.cpp" line="3824"/>
         <source>No Documents</source>
         <translation>Keine Dokumente</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3613"/>
+        <location filename="../../source/MainWindow.cpp" line="3825"/>
         <source>No saved documents found.
 
 Documents are saved to:
@@ -3277,68 +3412,68 @@ Dokumente werden gespeichert unter:
 %1</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3620"/>
+        <location filename="../../source/MainWindow.cpp" line="3832"/>
         <source>Select a document:</source>
         <translation>Dokument auswählen:</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3655"/>
-        <location filename="../../source/MainWindow.cpp" line="4134"/>
+        <location filename="../../source/MainWindow.cpp" line="3867"/>
+        <location filename="../../source/MainWindow.cpp" line="4346"/>
         <source>Load Error</source>
         <translation>Ladefehler</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3656"/>
+        <location filename="../../source/MainWindow.cpp" line="3868"/>
         <source>Failed to load document from:
 %1</source>
         <translation>Dokument konnte nicht geladen werden von:
 %1</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3819"/>
-        <location filename="../../source/MainWindow.cpp" line="3835"/>
+        <location filename="../../source/MainWindow.cpp" line="4031"/>
+        <location filename="../../source/MainWindow.cpp" line="4047"/>
         <source>Cannot Delete</source>
         <translation>Löschen nicht möglich</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3820"/>
+        <location filename="../../source/MainWindow.cpp" line="4032"/>
         <source>Cannot delete the last remaining page.</source>
         <translation>Die letzte verbleibende Seite kann nicht gelöscht werden.</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3836"/>
+        <location filename="../../source/MainWindow.cpp" line="4048"/>
         <source>Cannot delete PDF pages. Use an external tool to modify the PDF.</source>
         <translation>PDF-Seiten können nicht gelöscht werden. Verwenden Sie ein externes Tool, um das PDF zu bearbeiten.</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3913"/>
+        <location filename="../../source/MainWindow.cpp" line="4125"/>
         <source>PDF Files (*.pdf);;All Files (*)</source>
         <translation>PDF-Dateien (*.pdf);;Alle Dateien (*)</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3916"/>
+        <location filename="../../source/MainWindow.cpp" line="4128"/>
         <source>Open PDF</source>
         <translation>PDF öffnen</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3937"/>
+        <location filename="../../source/MainWindow.cpp" line="4149"/>
         <source>PDF Error</source>
         <translation>PDF-Fehler</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="3938"/>
+        <location filename="../../source/MainWindow.cpp" line="4150"/>
         <source>Failed to open PDF file:
 %1</source>
         <translation>PDF-Datei konnte nicht geöffnet werden:
 %1</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="4118"/>
+        <location filename="../../source/MainWindow.cpp" line="4330"/>
         <source>Open SpeedyNote Bundle (.snb folder)</source>
         <translation>SpeedyNote-Bundle öffnen (.snb-Ordner)</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="4135"/>
+        <location filename="../../source/MainWindow.cpp" line="4347"/>
         <source>Selected folder is not a valid SpeedyNote bundle.
 Missing document.json manifest.
 
@@ -3349,93 +3484,103 @@ Das Manifest document.json fehlt.
 %1</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="4198"/>
+        <location filename="../../source/MainWindow.cpp" line="4465"/>
         <source>Jump to Page</source>
         <translation>Zu Seite springen</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="4198"/>
+        <location filename="../../source/MainWindow.cpp" line="4465"/>
         <source>Enter Page Number:</source>
         <translation>Seitennummer eingeben:</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="5246"/>
+        <location filename="../../source/MainWindow.cpp" line="5542"/>
         <source>Pick recolor target</source>
         <translation>Ziel für Umfärbung wählen</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="5630"/>
+        <location filename="../../source/MainWindow.cpp" line="5926"/>
         <source>No results found</source>
         <translation>Keine Ergebnisse gefunden</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="5704"/>
+        <location filename="../../source/MainWindow.cpp" line="6000"/>
         <source>Scanning...</source>
         <translation>Scan läuft...</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="5751"/>
+        <location filename="../../source/MainWindow.cpp" line="6047"/>
         <source>Scanning all pages...</source>
         <translation>Alle Seiten werden gescannt...</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="5826"/>
-        <location filename="../../source/MainWindow.cpp" line="5844"/>
+        <location filename="../../source/MainWindow.cpp" line="6122"/>
+        <location filename="../../source/MainWindow.cpp" line="6140"/>
         <source>Auto-scanning...</source>
         <translation>Automatischer Scan läuft...</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="5975"/>
+        <location filename="../../source/MainWindow.cpp" line="6271"/>
         <source>Done: %1 words</source>
         <translation>Fertig: %1 Wörter</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="5987"/>
+        <location filename="../../source/MainWindow.cpp" line="6283"/>
         <source>OCR complete: %1 pages scanned, %2 with text</source>
         <translation>OCR abgeschlossen: %1 Seiten gescannt, %2 mit Text</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="6024"/>
+        <location filename="../../source/MainWindow.cpp" line="6320"/>
         <source>OCR error: %1</source>
         <translation>OCR-Fehler: %1</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="6232"/>
+        <location filename="../../source/MainWindow.cpp" line="6616"/>
+        <source>%1[*]</source>
+        <translation>%1[*]</translation>
+    </message>
+    <message>
+        <location filename="../../source/MainWindow.cpp" line="6618"/>
+        <source>%1[*] — SpeedyNote</source>
+        <translation>%1[*] — SpeedyNote</translation>
+    </message>
+    <message>
+        <location filename="../../source/MainWindow.cpp" line="6681"/>
         <source>OCR Language</source>
         <translation>OCR-Sprache</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="6238"/>
+        <location filename="../../source/MainWindow.cpp" line="6687"/>
         <source>Document: %1</source>
         <translation>Dokument: %1</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="6244"/>
+        <location filename="../../source/MainWindow.cpp" line="6693"/>
         <source>Handwriting recognition language for this document:</source>
         <translation>Handschrifterkennungssprache für dieses Dokument:</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="6249"/>
+        <location filename="../../source/MainWindow.cpp" line="6698"/>
         <source>Use global setting</source>
         <translation>Globale Einstellung verwenden</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="6250"/>
+        <location filename="../../source/MainWindow.cpp" line="6699"/>
         <source>Auto-detect (system default)</source>
         <translation>Automatisch erkennen (Systemstandard)</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="6309"/>
+        <location filename="../../source/MainWindow.cpp" line="6758"/>
         <source>&quot;Use global setting&quot; inherits from Settings &gt; Language &gt; Handwriting Recognition Language.</source>
         <translation>„Globale Einstellung verwenden“ übernimmt die Einstellung aus Einstellungen &gt; Sprache &gt; Handschrifterkennungssprache.</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="6350"/>
+        <location filename="../../source/MainWindow.cpp" line="6799"/>
         <source>Lock OCR Text</source>
         <translation>OCR-Text sperren</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="6351"/>
+        <location filename="../../source/MainWindow.cpp" line="6800"/>
         <source>Lock this OCR text? It will no longer be updated by automatic scanning.
 
 Proceed to lock and edit?</source>
@@ -3444,32 +3589,32 @@ Proceed to lock and edit?</source>
 Sperren und bearbeiten?</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="7348"/>
+        <location filename="../../source/MainWindow.cpp" line="7797"/>
         <source>New Edgeless Canvas</source>
         <translation>Neue unendliche Leinwand</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="7353"/>
+        <location filename="../../source/MainWindow.cpp" line="7802"/>
         <source>New Paged Notebook</source>
         <translation>Neues Notizbuch mit Seiten</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="7361"/>
+        <location filename="../../source/MainWindow.cpp" line="7810"/>
         <source>Open PDF...</source>
         <translation>PDF öffnen...</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="7366"/>
+        <location filename="../../source/MainWindow.cpp" line="7815"/>
         <source>Open Notebook...</source>
         <translation>Notizbuch öffnen...</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="8053"/>
+        <location filename="../../source/MainWindow.cpp" line="8502"/>
         <source>The %1 &quot;%2&quot; has unsaved changes. Do you want to save before quitting?</source>
         <translation>Das %1 &quot;%2&quot; enthält ungespeicherte Änderungen. Möchten Sie vor dem Beenden speichern?</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="8071"/>
+        <location filename="../../source/MainWindow.cpp" line="8520"/>
         <source>Failed to save document to:
 %1
 
@@ -3480,49 +3625,49 @@ Quit anyway?</source>
 Trotzdem beenden?</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="8369"/>
+        <location filename="../../source/MainWindow.cpp" line="8818"/>
         <source>Failed to save document before closing.</source>
         <translation>Dokument konnte vor dem Schließen nicht gespeichert werden.</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="8416"/>
+        <location filename="../../source/MainWindow.cpp" line="8865"/>
         <source>The file does not exist:
 %1</source>
         <translation>Die Datei existiert nicht:
 %1</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="8450"/>
-        <location filename="../../source/MainWindow.cpp" line="8468"/>
+        <location filename="../../source/MainWindow.cpp" line="8899"/>
+        <location filename="../../source/MainWindow.cpp" line="8917"/>
         <source>Open Error</source>
         <translation>Fehler beim Öffnen</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="8451"/>
+        <location filename="../../source/MainWindow.cpp" line="8900"/>
         <source>Failed to open file:
 %1</source>
         <translation>Datei konnte nicht geöffnet werden:
 %1</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="8469"/>
+        <location filename="../../source/MainWindow.cpp" line="8918"/>
         <source>Failed to create tab for:
 %1</source>
         <translation>Tab konnte nicht erstellt werden für:
 %1</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="8415"/>
+        <location filename="../../source/MainWindow.cpp" line="8864"/>
         <source>File Not Found</source>
         <translation>Datei nicht gefunden</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="551"/>
+        <location filename="../../source/MainWindow.cpp" line="586"/>
         <source>Notice</source>
         <translation>Hinweis</translation>
     </message>
     <message>
-        <location filename="../../source/MainWindow.cpp" line="552"/>
+        <location filename="../../source/MainWindow.cpp" line="587"/>
         <source>At least one tab must remain open.</source>
         <translation>Mindestens ein Tab muss geöffnet bleiben.</translation>
     </message>
@@ -3653,12 +3798,12 @@ Trotzdem beenden?</translation>
         <translation>Stärkenvoreinstellung %1 (zum Auswählen klicken, zum Bearbeiten erneut klicken)</translation>
     </message>
     <message>
-        <location filename="../../source/ui/subtoolbars/MarkerSubToolbar.cpp" line="278"/>
+        <location filename="../../source/ui/subtoolbars/MarkerSubToolbar.cpp" line="297"/>
         <source>Select Marker Color</source>
         <translation>Markierungsfarbe auswählen</translation>
     </message>
     <message>
-        <location filename="../../source/ui/subtoolbars/MarkerSubToolbar.cpp" line="314"/>
+        <location filename="../../source/ui/subtoolbars/MarkerSubToolbar.cpp" line="338"/>
         <source>Edit Marker Thickness</source>
         <translation>Markierungsstärke bearbeiten</translation>
     </message>
@@ -4399,12 +4544,12 @@ Sie können das Notizbuch weiterhin zum Erstellen von Notizen verwenden, aber di
         <translation>Strichstärkenvoreinstellung %1 (klicken zum Auswählen, erneut klicken zum Bearbeiten)</translation>
     </message>
     <message>
-        <location filename="../../source/ui/subtoolbars/PenSubToolbar.cpp" line="294"/>
+        <location filename="../../source/ui/subtoolbars/PenSubToolbar.cpp" line="311"/>
         <source>Select Pen Color</source>
         <translation>Stiftfarbe auswählen</translation>
     </message>
     <message>
-        <location filename="../../source/ui/subtoolbars/PenSubToolbar.cpp" line="331"/>
+        <location filename="../../source/ui/subtoolbars/PenSubToolbar.cpp" line="353"/>
         <source>Edit Pen Thickness</source>
         <translation>Stiftstärke bearbeiten</translation>
     </message>
@@ -4651,18 +4796,18 @@ https://www.libreoffice.org/download/download/</translation>
         <translation>Ungültiges Paket: document.json nach dem Entpacken nicht gefunden</translation>
     </message>
     <message>
-        <location filename="../../source/Main.cpp" line="1009"/>
-        <location filename="../../source/Main.cpp" line="1027"/>
+        <location filename="../../source/Main.cpp" line="1018"/>
+        <location filename="../../source/Main.cpp" line="1036"/>
         <source>Restore Previous Session</source>
         <translation>Vorherige Sitzung wiederherstellen</translation>
     </message>
     <message>
-        <location filename="../../source/Main.cpp" line="1010"/>
+        <location filename="../../source/Main.cpp" line="1019"/>
         <source>You had %1 other tab(s) open last time. Restore them?</source>
         <translation>Sie hatten beim letzten Mal %1 weitere(n) Tab(s) geöffnet. Wiederherstellen?</translation>
     </message>
     <message>
-        <location filename="../../source/Main.cpp" line="1028"/>
+        <location filename="../../source/Main.cpp" line="1037"/>
         <source>You had %1 tab(s) open last time. Restore them?</source>
         <translation>Sie hatten beim letzten Mal %1 Tab(s) geöffnet. Wiederherstellen?</translation>
     </message>
@@ -4766,592 +4911,598 @@ Versuchen Sie einen anderen Suchbegriff.</translation>
 <context>
     <name>ShortcutManager</name>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="99"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="112"/>
         <source>Save Document</source>
         <translation>Dokument speichern</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="99"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="100"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="101"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="102"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="103"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="104"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="105"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="106"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="112"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="113"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="114"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="115"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="116"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="117"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="118"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="119"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="120"/>
         <source>File</source>
         <translation>Datei</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="100"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="113"/>
+        <source>Save As...</source>
+        <translation>Speichern unter...</translation>
+    </message>
+    <message>
+        <location filename="../../source/core/ShortcutManager.cpp" line="114"/>
         <source>New Paged Notebook</source>
         <translation>Neues paginiertes Notizbuch</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="101"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="115"/>
         <source>New Edgeless Canvas</source>
         <translation>Neue unendliche Leinwand</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="102"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="116"/>
         <source>Open PDF</source>
         <translation>PDF öffnen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="103"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="117"/>
         <source>Open Notebook</source>
         <translation>Notizbuch öffnen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="104"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="118"/>
         <source>Close Tab</source>
         <translation>Tab schließen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="105"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="119"/>
         <source>Export/Share</source>
         <translation>Exportieren/Teilen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="106"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="120"/>
         <source>Export to PDF</source>
         <translation>Als PDF exportieren</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="109"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="123"/>
         <source>Add Page (Append)</source>
         <translation>Seite hinzufügen (anhängen)</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="109"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="110"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="111"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="123"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="124"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="125"/>
         <source>Document</source>
         <translation>Dokument</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="110"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="124"/>
         <source>Insert Page</source>
         <translation>Seite einfügen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="111"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="125"/>
         <source>Delete Page</source>
         <translation>Seite löschen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="114"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="128"/>
         <source>Toggle Launcher</source>
         <translation>Launcher umschalten</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="114"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="116"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="117"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="118"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="119"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="120"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="122"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="123"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="124"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="128"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="130"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="131"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="132"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="133"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="134"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="136"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="137"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="138"/>
         <source>Navigation</source>
         <translation>Navigation</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="116"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="130"/>
         <source>Previous Page</source>
         <translation>Vorherige Seite</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="117"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="131"/>
         <source>Next Page</source>
         <translation>Nächste Seite</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="118"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="132"/>
         <source>First Page</source>
         <translation>Erste Seite</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="119"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="133"/>
         <source>Last Page</source>
         <translation>Letzte Seite</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="120"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="134"/>
         <source>Go to Page...</source>
         <translation>Gehe zu Seite...</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="122"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="136"/>
         <source>Next Tab</source>
         <translation>Nächster Tab</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="123"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="137"/>
         <source>Previous Tab</source>
         <translation>Vorheriger Tab</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="124"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="138"/>
         <source>Escape/Cancel</source>
         <translation>Escape/Abbrechen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="127"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="141"/>
         <source>Pen Tool</source>
         <translation>Stift-Werkzeug</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="127"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="128"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="129"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="130"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="131"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="132"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="133"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="141"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="142"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="143"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="144"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="145"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="146"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="147"/>
         <source>Tools</source>
         <translation>Werkzeuge</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="128"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="142"/>
         <source>Eraser Tool</source>
         <translation>Radiergummi-Werkzeug</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="129"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="143"/>
         <source>Lasso Tool</source>
         <translation>Lasso-Werkzeug</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="130"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="144"/>
         <source>Text Highlighter Tool</source>
         <translation>Textmarker-Werkzeug</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="131"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="145"/>
         <source>Marker Tool</source>
         <translation>Marker-Werkzeug</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="132"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="146"/>
         <source>Object Select Tool</source>
         <translation>Objektauswahl-Werkzeug</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="133"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="147"/>
         <source>Pan Tool (Hold)</source>
         <translation>Hand-Werkzeug (halten)</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="136"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="150"/>
         <source>Undo</source>
         <translation>Rückgängig</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="136"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="137"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="138"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="139"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="140"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="141"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="142"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="143"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="144"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="150"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="151"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="152"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="153"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="154"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="155"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="156"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="157"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="158"/>
         <source>Edit</source>
         <translation>Bearbeiten</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="137"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="151"/>
         <source>Redo</source>
         <translation>Wiederholen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="138"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="152"/>
         <source>Redo (Alternative)</source>
         <translation>Wiederholen (alternativ)</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="139"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="153"/>
         <source>Copy</source>
         <translation>Kopieren</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="140"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="154"/>
         <source>Cut</source>
         <translation>Ausschneiden</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="141"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="155"/>
         <source>Paste</source>
         <translation>Einfügen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="142"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="156"/>
         <source>Delete</source>
         <translation>Löschen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="143"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="157"/>
         <source>Select All</source>
         <translation>Alles auswählen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="144"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="158"/>
         <source>Deselect</source>
         <translation>Auswahl aufheben</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="147"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="161"/>
         <source>Zoom In</source>
         <translation>Vergrößern</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="147"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="148"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="149"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="150"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="151"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="152"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="161"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="162"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="163"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="164"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="165"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="166"/>
         <source>Zoom</source>
         <translation>Zoom</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="148"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="162"/>
         <source>Zoom In (Alternative)</source>
         <translation>Vergrößern (alternativ)</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="149"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="163"/>
         <source>Zoom Out</source>
         <translation>Verkleinern</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="150"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="164"/>
         <source>Zoom to Fit</source>
         <translation>An Fenster anpassen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="151"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="165"/>
         <source>Zoom to 100%</source>
         <translation>Auf 100 % zoomen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="152"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="166"/>
         <source>Zoom to Fit Width</source>
         <translation>An Breite anpassen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="155"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="169"/>
         <source>Bring to Front</source>
         <translation>Ganz nach vorne</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="155"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="156"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="157"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="158"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="161"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="162"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="163"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="166"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="167"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="168"/>
         <location filename="../../source/core/ShortcutManager.cpp" line="169"/>
         <location filename="../../source/core/ShortcutManager.cpp" line="170"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="171"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="172"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="175"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="176"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="177"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="180"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="181"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="182"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="183"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="184"/>
         <source>Objects</source>
         <translation>Objekte</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="156"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="170"/>
         <source>Bring Forward</source>
         <translation>Eine Ebene nach vorne</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="157"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="171"/>
         <source>Send Backward</source>
         <translation>Eine Ebene nach hinten</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="158"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="172"/>
         <source>Send to Back</source>
         <translation>Ganz nach hinten</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="161"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="175"/>
         <source>Increase Affinity</source>
         <translation>Ebene erhöhen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="162"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="176"/>
         <source>Decrease Affinity</source>
         <translation>Ebene verringern</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="163"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="177"/>
         <source>Send to Background</source>
         <translation>In den Hintergrund senden</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="166"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="180"/>
         <source>Image Insert Mode</source>
         <translation>Bild-Einfügemodus</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="167"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="181"/>
         <source>Link Insert Mode</source>
         <translation>Link-Einfügemodus</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="168"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="182"/>
         <source>Text Insert Mode</source>
         <translation>Text-Einfügemodus</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="169"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="183"/>
         <source>Object Create Mode</source>
         <translation>Objekt-Erstellungsmodus</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="170"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="184"/>
         <source>Object Select Mode</source>
         <translation>Objekt-Auswahlmodus</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="173"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="187"/>
         <source>Activate Link Slot 1</source>
         <translation>Link-Slot 1 aktivieren</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="173"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="174"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="175"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="187"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="188"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="189"/>
         <source>Links</source>
         <translation>Links</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="174"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="188"/>
         <source>Activate Link Slot 2</source>
         <translation>Link-Slot 2 aktivieren</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="175"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="189"/>
         <source>Activate Link Slot 3</source>
         <translation>Link-Slot 3 aktivieren</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="178"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="192"/>
         <source>New Layer</source>
         <translation>Neue Ebene</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="178"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="179"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="180"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="181"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="182"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="183"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="192"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="193"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="194"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="195"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="196"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="197"/>
         <source>Layers</source>
         <translation>Ebenen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="179"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="193"/>
         <source>Toggle Layer Visibility</source>
         <translation>Ebenensichtbarkeit umschalten</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="180"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="194"/>
         <source>Select All Layers</source>
         <translation>Alle Ebenen auswählen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="181"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="195"/>
         <source>Select Top Layer</source>
         <translation>Oberste Ebene auswählen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="182"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="196"/>
         <source>Select Bottom Layer</source>
         <translation>Unterste Ebene auswählen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="183"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="197"/>
         <source>Merge Layers</source>
         <translation>Ebenen zusammenführen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="186"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="200"/>
         <source>Toggle Fullscreen</source>
         <translation>Vollbild umschalten</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="186"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="187"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="188"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="189"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="190"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="191"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="192"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="193"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="194"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="200"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="201"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="202"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="203"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="204"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="205"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="206"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="207"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="208"/>
         <source>View</source>
         <translation>Ansicht</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="187"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="201"/>
         <source>Toggle Debug Overlay</source>
         <translation>Debug-Overlay umschalten</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="188"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="202"/>
         <source>Toggle Auto Layout</source>
         <translation>Automatisches Layout umschalten</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="189"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="203"/>
         <source>Toggle Left Sidebar</source>
         <translation>Linke Seitenleiste umschalten</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="190"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="204"/>
         <source>Toggle Right Sidebar</source>
         <translation>Rechte Seitenleiste umschalten</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="191"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="205"/>
         <source>Split Tab Right</source>
         <translation>Tab nach rechts teilen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="192"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="206"/>
         <source>Merge All to Left</source>
         <translation>Alle nach links zusammenführen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="193"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="207"/>
         <source>Focus Left Pane</source>
         <translation>Linkes Fenster fokussieren</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="194"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="208"/>
         <source>Focus Right Pane</source>
         <translation>Rechtes Fenster fokussieren</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="197"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="211"/>
         <source>Scan Page</source>
         <translation>Seite scannen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="197"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="198"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="199"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="200"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="201"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="211"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="212"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="213"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="214"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="215"/>
         <source>OCR</source>
         <translation>OCR</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="198"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="212"/>
         <source>Scan All Pages</source>
         <translation>Alle Seiten scannen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="199"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="213"/>
         <source>Toggle Auto OCR</source>
         <translation>Automatisches OCR umschalten</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="200"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="214"/>
         <source>Toggle Recognized Text</source>
         <translation>Erkannten Text umschalten</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="201"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="215"/>
         <source>Toggle OCR Snap to Grid</source>
         <translation>OCR-Rastereinrastung umschalten</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="207"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="221"/>
         <source>Auto-Highlight: None</source>
         <translation>Auto-Hervorhebung: Keine</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="207"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="208"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="209"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="210"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="211"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="221"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="222"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="223"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="224"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="225"/>
         <source>Highlighter</source>
         <translation>Textmarker</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="208"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="222"/>
         <source>Auto-Highlight: Cover Text</source>
         <translation>Auto-Hervorhebung: Text abdecken</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="209"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="223"/>
         <source>Auto-Highlight: Underline</source>
         <translation>Auto-Hervorhebung: Unterstreichen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="210"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="224"/>
         <source>Auto-Highlight: Dotted Underline</source>
         <translation>Auto-Hervorhebung: Gepunktete Unterstreichung</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="211"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="225"/>
         <source>Toggle Highlighter Source (PDF/OCR)</source>
         <translation>Textmarker-Quelle umschalten (PDF/OCR)</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="214"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="228"/>
         <source>Settings</source>
         <translation>Einstellungen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="214"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="215"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="216"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="217"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="218"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="228"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="229"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="230"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="231"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="232"/>
         <source>Application</source>
         <translation>Anwendung</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="215"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="229"/>
         <source>Keyboard Shortcuts</source>
         <translation>Tastaturkürzel</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="216"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="230"/>
         <source>Find in Document</source>
         <translation>Im Dokument suchen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="217"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="231"/>
         <source>Find Next</source>
         <translation>Weitersuchen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="218"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="232"/>
         <source>Find Previous</source>
         <translation>Vorheriges suchen</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="221"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="235"/>
         <source>Return to Origin</source>
         <translation>Zum Ursprung zurückkehren</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="221"/>
-        <location filename="../../source/core/ShortcutManager.cpp" line="222"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="235"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="236"/>
         <source>Edgeless</source>
         <translation>Randlos</translation>
     </message>
     <message>
-        <location filename="../../source/core/ShortcutManager.cpp" line="222"/>
+        <location filename="../../source/core/ShortcutManager.cpp" line="236"/>
         <source>Go Back</source>
         <translation>Zurück</translation>
     </message>
