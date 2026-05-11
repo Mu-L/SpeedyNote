@@ -1067,48 +1067,18 @@ void MainWindow::setupUi() {
     
     overflowMenu->addSeparator();
 
+    // MAC.6 review fix: pre-MAC.6 this wrapped showOcrLanguageDialog() in a
+    // no-arg lambda because the slot was private. After MAC.6 promoted it to
+    // private slots: (so MacMenuBar can invokeMethod it), the direct PMF
+    // connect works and matches the lockAllOcrAction pattern below.
     QAction *ocrLanguageAction = overflowMenu->addAction(tr("OCR Language..."));
-    connect(ocrLanguageAction, &QAction::triggered, this, [this]() {
-        showOcrLanguageDialog();
-    });
+    connect(ocrLanguageAction, &QAction::triggered, this, &MainWindow::showOcrLanguageDialog);
 
+    // MAC.6: body extracted to MainWindow::lockAllOcrText() so the macOS OCR
+    // menu (which can't access this private inline lambda) shares one
+    // implementation with the overflow menu via QMetaObject::invokeMethod.
     QAction *lockAllOcrAction = overflowMenu->addAction(tr("Lock All OCR Text"));
-    connect(lockAllOcrAction, &QAction::triggered, this, [this]() {
-        DocumentViewport* vp = currentViewport();
-        if (!vp || !vp->document()) return;
-
-        auto lockOnPage = [](Page* page) -> QVector<QString> {
-            QVector<QString> ids;
-            if (!page) return ids;
-            for (const auto& obj : page->objects) {
-                if (obj->type() == QStringLiteral("ocr_text")) {
-                    auto* ocr = static_cast<OcrTextObject*>(obj.get());
-                    if (!ocr->ocrLocked) {
-                        ocr->ocrLocked = true;
-                        ids.append(ocr->id);
-                    }
-                }
-            }
-            return ids;
-        };
-
-        QVector<QString> lockedIds;
-        Document* doc = vp->document();
-        if (doc->isEdgeless()) {
-            for (auto coord : doc->allLoadedTileCoords()) {
-                Page* tile = doc->getTile(coord.first, coord.second);
-                lockedIds += lockOnPage(tile);
-            }
-        } else {
-            Page* page = doc->page(vp->currentPageIndex());
-            lockedIds = lockOnPage(page);
-        }
-
-        if (!lockedIds.isEmpty()) {
-            vp->pushOcrLockUndo(lockedIds, true);
-            vp->update();
-        }
-    });
+    connect(lockAllOcrAction, &QAction::triggered, this, &MainWindow::lockAllOcrText);
 
 #ifndef Q_OS_MACOS
     // MAC.4 / MAC.5: hidden on macOS — the View menu's 'Go to Page...' (added
@@ -1841,6 +1811,213 @@ void MainWindow::wireQActionDispatchers()
     // registry id). The macOS *menu item* is the only thing gated on
     // SPEEDYNOTE_DEBUG, in MacMenuBar::populateViewMenu (per QA Q4.3.a).
     wire("view.debug_overlay", [](MainWindow* w){ w->toggleDebugOverlay(); });
+
+    // ----- OCR (MAC.6) -----
+    // Each handler delegates to OcrSubToolbar's keyboard-shortcut entry points
+    // (triggerScanPage / triggerScanAll / toggleAutoOcr / toggleShowText /
+    // toggleSnapToGrid), which forward to the corresponding button's click()
+    // / toggle() so the existing button-toggled signal path (showTextToggled,
+    // autoOcrToggled, snapToGridToggled) drives all downstream sync — incl.
+    // the menu-checkmark sync edges established in setupConnections() (see
+    // MAC.6 in the ocrST connect block).
+    //
+    // Bodies are 1:1 with the pre-MAC.6 createShortcut lambdas. The toggle
+    // wires intentionally connect to triggered() (no args) rather than
+    // triggered(bool): the QAction's check state is not authoritative, the
+    // toolbar button is. We just call toggle() and let the button's
+    // XxxToggled(bool) signal push the post-toggle state back onto the
+    // QAction. See the plan's checkable-sync diagram for the full data flow.
+    wire("ocr.scan_page", [](MainWindow* w){
+        if (auto* st = w->m_toolbar ? w->m_toolbar->ocrSubToolbar() : nullptr)
+            st->triggerScanPage();
+    });
+    wire("ocr.scan_all", [](MainWindow* w){
+        if (auto* st = w->m_toolbar ? w->m_toolbar->ocrSubToolbar() : nullptr)
+            st->triggerScanAll();
+    });
+    wire("ocr.auto_ocr", [](MainWindow* w){
+        if (auto* st = w->m_toolbar ? w->m_toolbar->ocrSubToolbar() : nullptr)
+            st->toggleAutoOcr();
+    });
+    wire("ocr.show_text", [](MainWindow* w){
+        if (auto* st = w->m_toolbar ? w->m_toolbar->ocrSubToolbar() : nullptr)
+            st->toggleShowText();
+    });
+    wire("ocr.snap_grid", [](MainWindow* w){
+        if (auto* st = w->m_toolbar ? w->m_toolbar->ocrSubToolbar() : nullptr)
+            st->toggleSnapToGrid();
+    });
+
+    // ----- tab navigation (MAC.6) -----
+    // Bodies match the pre-MAC.6 createShortcut lambdas. No scope: tabs are a
+    // window-level concept and the actions are always enabled; the macOS
+    // Window menu surfaces them per QA Q4.7.
+    wire("navigation.next_tab", [](MainWindow* w){
+        if (auto* tm = w->tabManager()) tm->switchToNextTab();
+    });
+    wire("navigation.prev_tab", [](MainWindow* w){
+        if (auto* tm = w->tabManager()) tm->switchToPrevTab();
+    });
+
+    // ----- Tools (MAC.7) -----
+    // Letter-key tool shortcuts (B/E/L/T/M/V) and object.mode_image (I) need
+    // to be inert while a text-input widget has focus, otherwise typing those
+    // letters would switch tools instead of being entered into the field.
+    // Pre-MAC.7 the inline createToolShortcut helper at MainWindow.cpp:2037
+    // performed this check; we preserve that behaviour here rather than rely
+    // on the QA Q6.5.2 hope that Qt::WindowShortcut event-propagation handles
+    // it (modifier-bearing actions don't need this guard).
+    auto isTextFocused = []() {
+        QWidget* f = QApplication::focusWidget();
+        return qobject_cast<QLineEdit*>(f) || qobject_cast<QTextEdit*>(f)
+            || qobject_cast<QPlainTextEdit*>(f);
+    };
+    auto wireToolKey = [&wire, isTextFocused](const QString& id, ToolType tool) {
+        wire(id, [tool, isTextFocused](MainWindow* w) {
+            if (isTextFocused()) return;
+            if (w->m_panHoldActive) w->m_panHoldActive = false;
+            if (auto* vp = w->currentViewport()) {
+                if (w->m_toolOverrideViewport == vp)
+                    w->m_toolOverrideViewport = nullptr;
+                vp->setCurrentTool(tool);
+            }
+        });
+    };
+    wireToolKey("tool.pen",           ToolType::Pen);
+    wireToolKey("tool.marker",        ToolType::Marker);
+    wireToolKey("tool.highlighter",   ToolType::Highlighter);
+    wireToolKey("tool.eraser",        ToolType::Eraser);
+    wireToolKey("tool.lasso",         ToolType::Lasso);
+    wireToolKey("tool.object_select", ToolType::ObjectSelect);
+    // tool.pan (H) is intentionally NOT wired — it is hold-to-activate via
+    // the existing event-filter path (m_panHoldKey / changeEvent / eventFilter).
+    // Its registry shortcut is read once in setupManagedShortcuts() to seed
+    // m_panHoldKey; onShortcutChanged keeps it in sync after user remaps.
+
+    // ----- Highlighter Style (MAC.7) -----
+    // Style shortcuts drive the dropdown's QAction::trigger() path so the
+    // existing onAutoHighlightStyleTriggered() slot handles persistence,
+    // check-state, icon refresh, and autoHighlightStyleChanged emission.
+    // No current-tool gate: these set the globally persisted style, so users
+    // can pre-configure before switching to the Highlighter tool.
+    using HS = HighlighterSubToolbar::HighlightStyle;
+    wire("highlighter.style_none", [](MainWindow* w){
+        if (auto* st = w->m_toolbar ? w->m_toolbar->highlighterSubToolbar() : nullptr)
+            st->selectAutoHighlightStyleFromShortcut(HS::None);
+    });
+    wire("highlighter.style_cover", [](MainWindow* w){
+        if (auto* st = w->m_toolbar ? w->m_toolbar->highlighterSubToolbar() : nullptr)
+            st->selectAutoHighlightStyleFromShortcut(HS::Cover);
+    });
+    wire("highlighter.style_underline", [](MainWindow* w){
+        if (auto* st = w->m_toolbar ? w->m_toolbar->highlighterSubToolbar() : nullptr)
+            st->selectAutoHighlightStyleFromShortcut(HS::Underline);
+    });
+    wire("highlighter.style_dotted", [](MainWindow* w){
+        if (auto* st = w->m_toolbar ? w->m_toolbar->highlighterSubToolbar() : nullptr)
+            st->selectAutoHighlightStyleFromShortcut(HS::DottedUnderline);
+    });
+    wire("highlighter.toggle_source", [](MainWindow* w){
+        if (auto* st = w->m_toolbar ? w->m_toolbar->highlighterSubToolbar() : nullptr)
+            st->toggleSelectionSourceFromShortcut();
+    });
+
+    // ----- Insert / Object Mode (MAC.7) -----
+    // object.mode_image uses the focus-check guard (single-letter "I"); the
+    // others are modifier-bearing and don't need it. All five are gated on
+    // currentTool == ObjectSelect inside the handler — pre-MAC.7 behaviour.
+    wire("object.mode_image", [isTextFocused](MainWindow* w){
+        if (isTextFocused()) return;
+        if (auto* vp = w->currentViewport()) {
+            if (vp->currentTool() == ToolType::ObjectSelect) {
+                vp->setObjectInsertMode(DocumentViewport::ObjectInsertMode::Image);
+            }
+        }
+    });
+    wire("object.mode_text", [](MainWindow* w){
+        if (auto* vp = w->currentViewport()) {
+            if (vp->currentTool() == ToolType::ObjectSelect) {
+                vp->setObjectInsertMode(DocumentViewport::ObjectInsertMode::Text);
+            }
+        }
+    });
+    wire("object.mode_link", [](MainWindow* w){
+        if (auto* vp = w->currentViewport()) {
+            if (vp->currentTool() == ToolType::ObjectSelect) {
+                vp->setObjectInsertMode(DocumentViewport::ObjectInsertMode::Link);
+            }
+        }
+    });
+    wire("object.mode_create", [](MainWindow* w){
+        if (auto* vp = w->currentViewport()) {
+            if (vp->currentTool() == ToolType::ObjectSelect) {
+                vp->setObjectActionMode(DocumentViewport::ObjectActionMode::Create);
+            }
+        }
+    });
+    wire("object.mode_select", [](MainWindow* w){
+        if (auto* vp = w->currentViewport()) {
+            if (vp->currentTool() == ToolType::ObjectSelect) {
+                vp->setObjectActionMode(DocumentViewport::ObjectActionMode::Select);
+            }
+        }
+    });
+
+    // ----- Object Z-order + Affinity (MAC.7) -----
+    // All 7 stay gated inline on currentTool == ObjectSelect && hasSelectedObjects.
+    // Visual grey-out is handled by MainWindow::updateObjectActionsEnabled()
+    // which is wired to viewport's toolChanged + objectSelectionChanged signals
+    // (in connectViewportScrollSignals) and to MainWindow::changeEvent's
+    // ActivationChange branch. The handler-side gate is kept as a defence-in-
+    // depth safeguard in case the shortcut fires faster than the enable wire.
+    //
+    // MAC.7 review: factored to a PMF-based helper so the 7 nearly-identical
+    // 4-line lambdas collapse to one row each. The pre-refactor version is
+    // in git history if anyone needs to inspect the per-action body.
+    auto wireSelObj = [&wire](const QString& id, void (DocumentViewport::*op)()) {
+        wire(id, [op](MainWindow* w){
+            if (auto* vp = w->currentViewport()) {
+                if (vp->currentTool() == ToolType::ObjectSelect && vp->hasSelectedObjects())
+                    (vp->*op)();
+            }
+        });
+    };
+    wireSelObj("object.bring_front",         &DocumentViewport::bringSelectedToFront);
+    wireSelObj("object.bring_forward",       &DocumentViewport::bringSelectedForward);
+    wireSelObj("object.send_backward",       &DocumentViewport::sendSelectedBackward);
+    wireSelObj("object.send_back",           &DocumentViewport::sendSelectedToBack);
+    wireSelObj("object.affinity_up",         &DocumentViewport::increaseSelectedAffinity);
+    wireSelObj("object.affinity_down",       &DocumentViewport::decreaseSelectedAffinity);
+    wireSelObj("object.affinity_background", &DocumentViewport::sendSelectedToBackground);
+
+    // ----- Layers (MAC.7) -----
+    // All 6 forward to LayerPanel methods; the m_layerPanel null-guard mirrors
+    // pre-MAC.7 createShortcut behaviour for windows where the panel hasn't
+    // been built yet (defensive — m_layerPanel is created in setupUi).
+    auto wireLayer = [&wire](const QString& id, void (LayerPanel::*op)()) {
+        wire(id, [op](MainWindow* w){
+            if (w->m_layerPanel) (w->m_layerPanel->*op)();
+        });
+    };
+    wireLayer("layer.new",               &LayerPanel::addNewLayerAction);
+    wireLayer("layer.toggle_visibility", &LayerPanel::toggleActiveLayerVisibility);
+    wireLayer("layer.select_all",        &LayerPanel::toggleSelectAllLayers);
+    wireLayer("layer.select_top",        &LayerPanel::selectTopLayer);
+    wireLayer("layer.select_bottom",     &LayerPanel::selectBottomLayer);
+    wireLayer("layer.merge",             &LayerPanel::mergeSelectedLayers);
+
+    // ----- Link Slots (MAC.7) -----
+    // All 3 are gated on currentTool == ObjectSelect inside the handler.
+    auto wireLinkSlot = [&wire](const QString& id, int slot) {
+        wire(id, [slot](MainWindow* w){
+            if (auto* vp = w->currentViewport()) {
+                if (vp->currentTool() == ToolType::ObjectSelect) vp->activateLinkSlot(slot);
+            }
+        });
+    };
+    wireLinkSlot("link.slot_1", 0);
+    wireLinkSlot("link.slot_2", 1);
+    wireLinkSlot("link.slot_3", 2);
 }
 
 void MainWindow::setupManagedShortcuts()
@@ -1909,6 +2086,54 @@ void MainWindow::setupManagedShortcuts()
     bindAction("view.focus_right_pane");
     bindAction("view.fullscreen");
     bindAction("view.debug_overlay");
+    // MAC.6: ocr.* + tab navigation bindings
+    bindAction("ocr.scan_page");
+    bindAction("ocr.scan_all");
+    bindAction("ocr.auto_ocr");
+    bindAction("ocr.show_text");
+    bindAction("ocr.snap_grid");
+    bindAction("navigation.next_tab");
+    bindAction("navigation.prev_tab");
+    // MAC.7: tools + highlighter style + insert + object Z/affinity + layers + links
+    bindAction("tool.pen");
+    bindAction("tool.marker");
+    bindAction("tool.highlighter");
+    bindAction("tool.eraser");
+    bindAction("tool.lasso");
+    bindAction("tool.object_select");
+    bindAction("highlighter.style_none");
+    bindAction("highlighter.style_cover");
+    bindAction("highlighter.style_underline");
+    bindAction("highlighter.style_dotted");
+    bindAction("highlighter.toggle_source");
+    bindAction("object.mode_image");
+    bindAction("object.mode_text");
+    bindAction("object.mode_link");
+    bindAction("object.mode_create");
+    bindAction("object.mode_select");
+    bindAction("object.bring_front");
+    bindAction("object.bring_forward");
+    bindAction("object.send_backward");
+    bindAction("object.send_back");
+    bindAction("object.affinity_up");
+    bindAction("object.affinity_down");
+    bindAction("object.affinity_background");
+    bindAction("layer.new");
+    bindAction("layer.toggle_visibility");
+    bindAction("layer.select_all");
+    bindAction("layer.select_top");
+    bindAction("layer.select_bottom");
+    bindAction("layer.merge");
+    bindAction("link.slot_1");
+    bindAction("link.slot_2");
+    bindAction("link.slot_3");
+
+    // MAC.7: Seed the object Z-order + affinity QActions' enable state on
+    // first window construction. The viewport-level connects in
+    // connectViewportScrollSignals also call this, but those only run after
+    // a viewport is added; this initial pass guarantees a sane baseline if
+    // no viewport exists yet (e.g. fresh window with launcher visible).
+    updateObjectActionsEnabled();
 
     // Helper lambda to create and register a managed shortcut
     auto createShortcut = [this, sm](const QString& actionId, 
@@ -1967,8 +2192,10 @@ void MainWindow::setupManagedShortcuts()
     // MAC.5: navigation.go_to_page is now wired via wireQActionDispatchers()
     // above and associated to this window via bindAction(); the macOS View menu
     // also surfaces it as 'Go to Page...'.
-    // navigation.next_tab, navigation.prev_tab - TODO: implement tab switching
-    
+    // MAC.6: navigation.next_tab / navigation.prev_tab moved to wireQActionDispatchers()
+    // (see the "Tab Navigation" comment block below). Pre-MAC.6 this line
+    // was a TODO; the migration completed it.
+
     // ===== View =====
     // MAC.5: view.debug_overlay / view.auto_layout / view.fullscreen /
     // view.left_sidebar / view.right_sidebar / view.split_right /
@@ -2008,38 +2235,15 @@ void MainWindow::setupManagedShortcuts()
     // MAC.3: file.export and file.export_pdf are wired via wireQActionDispatchers() above.
 
     // ===== Tools (delegated to viewport) =====
-    // These need to check if text input is active before firing
-    auto createToolShortcut = [this, sm](const QString& actionId, ToolType tool) {
-        QKeySequence seq = sm->keySequenceForAction(actionId);
-        QShortcut* shortcut = new QShortcut(seq, this);
-        shortcut->setContext(Qt::ApplicationShortcut);
-        connect(shortcut, &QShortcut::activated, this, [this, tool]() {
-            // Skip if text input widget has focus (single-key shortcuts conflict with typing)
-            QWidget* focused = QApplication::focusWidget();
-            if (qobject_cast<QLineEdit*>(focused) ||
-                qobject_cast<QTextEdit*>(focused) ||
-                qobject_cast<QPlainTextEdit*>(focused)) {
-                return;
-            }
-            
-            if (m_panHoldActive) m_panHoldActive = false;
-            if (DocumentViewport* vp = currentViewport()) {
-                if (m_toolOverrideViewport == vp)
-                    m_toolOverrideViewport = nullptr;
-                vp->setCurrentTool(tool);
-            }
-        });
-        m_managedShortcuts.insert(actionId, shortcut);
-    };
-    
-    createToolShortcut("tool.pen", ToolType::Pen);
-    createToolShortcut("tool.eraser", ToolType::Eraser);
-    createToolShortcut("tool.lasso", ToolType::Lasso);
-    createToolShortcut("tool.highlighter", ToolType::Highlighter);
-    createToolShortcut("tool.marker", ToolType::Marker);
-    createToolShortcut("tool.object_select", ToolType::ObjectSelect);
-    
+    // MAC.7: tool.pen / marker / highlighter / eraser / lasso / object_select
+    // are now wired via wireQActionDispatchers() above (using the wireToolKey
+    // helper which preserves the focus-check guard) and associated to this
+    // window via bindAction(). The macOS Tools menu surfaces the 6 items.
+
     // Pan tool: H key hold handled via event filter, not QShortcut (need release detection)
+    // MAC.7: tool.pan stays out of the dispatcher — it is hold-to-activate.
+    // Read its key code once here to seed m_panHoldKey; onShortcutChanged
+    // updates it after user remaps via Settings.
     {
         QKeySequence panSeq = sm->keySequenceForAction("tool.pan");
         if (!panSeq.isEmpty()) {
@@ -2072,16 +2276,9 @@ void MainWindow::setupManagedShortcuts()
     // dispatch). All four are PagedOnly and bindAction'd below.
     
     // ===== Tab Navigation =====
-    createShortcut("navigation.next_tab", [this]() {
-        if (tabManager()) {
-            tabManager()->switchToNextTab();
-        }
-    });
-    createShortcut("navigation.prev_tab", [this]() {
-        if (tabManager()) {
-            tabManager()->switchToPrevTab();
-        }
-    });
+    // MAC.6: navigation.next_tab / navigation.prev_tab are now wired via
+    // wireQActionDispatchers() above and associated to this window via
+    // bindAction(). The macOS Window menu surfaces them per QA Q4.7.
     // MAC.3: file.close_tab is wired via wireQActionDispatchers() above.
 
     // ===== Zoom Shortcuts =====
@@ -2092,36 +2289,10 @@ void MainWindow::setupManagedShortcuts()
     // is intentionally not in the menu, alt binding only.
     
     // ===== Layer Operations =====
-    createShortcut("layer.new", [this]() {
-        if (m_layerPanel) {
-            m_layerPanel->addNewLayerAction();
-        }
-    });
-    createShortcut("layer.toggle_visibility", [this]() {
-        if (m_layerPanel) {
-            m_layerPanel->toggleActiveLayerVisibility();
-        }
-    });
-    createShortcut("layer.select_all", [this]() {
-        if (m_layerPanel) {
-            m_layerPanel->toggleSelectAllLayers();
-        }
-    });
-    createShortcut("layer.select_top", [this]() {
-        if (m_layerPanel) {
-            m_layerPanel->selectTopLayer();
-        }
-    });
-    createShortcut("layer.select_bottom", [this]() {
-        if (m_layerPanel) {
-            m_layerPanel->selectBottomLayer();
-        }
-    });
-    createShortcut("layer.merge", [this]() {
-        if (m_layerPanel) {
-            m_layerPanel->mergeSelectedLayers();
-        }
-    });
+    // MAC.7: layer.new / toggle_visibility / select_all / select_top /
+    // select_bottom / merge are now wired via wireQActionDispatchers() above
+    // and associated to this window via bindAction(). The macOS Tools >
+    // Layers submenu surfaces all 6.
     
     // ===== Context-Dependent Edit Operations (delegated to viewport) =====
     // MAC.4: edit.copy / edit.cut / edit.paste / edit.delete are now wired via
@@ -2130,171 +2301,30 @@ void MainWindow::setupManagedShortcuts()
     // cross-viewport tool-override clear for Paste.
     
     // ===== Object Manipulation (delegated to viewport, ObjectSelect tool) =====
-    // Z-Order
-    createShortcut("object.bring_front", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->currentTool() == ToolType::ObjectSelect && vp->hasSelectedObjects()) {
-                vp->bringSelectedToFront();
-            }
-        }
-    });
-    createShortcut("object.bring_forward", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->currentTool() == ToolType::ObjectSelect && vp->hasSelectedObjects()) {
-                vp->bringSelectedForward();
-            }
-        }
-    });
-    createShortcut("object.send_backward", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->currentTool() == ToolType::ObjectSelect && vp->hasSelectedObjects()) {
-                vp->sendSelectedBackward();
-            }
-        }
-    });
-    createShortcut("object.send_back", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->currentTool() == ToolType::ObjectSelect && vp->hasSelectedObjects()) {
-                vp->sendSelectedToBack();
-            }
-        }
-    });
-    
-    // Affinity
-    createShortcut("object.affinity_up", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->currentTool() == ToolType::ObjectSelect && vp->hasSelectedObjects()) {
-                vp->increaseSelectedAffinity();
-            }
-        }
-    });
-    createShortcut("object.affinity_down", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->currentTool() == ToolType::ObjectSelect && vp->hasSelectedObjects()) {
-                vp->decreaseSelectedAffinity();
-            }
-        }
-    });
-    createShortcut("object.affinity_background", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->currentTool() == ToolType::ObjectSelect && vp->hasSelectedObjects()) {
-                vp->sendSelectedToBackground();
-            }
-        }
-    });
-    
-    // Object Mode Switching
-    createShortcut("object.mode_image", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->currentTool() == ToolType::ObjectSelect) {
-                vp->setObjectInsertMode(DocumentViewport::ObjectInsertMode::Image);
-            }
-        }
-    });
-    createShortcut("object.mode_link", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->currentTool() == ToolType::ObjectSelect) {
-                vp->setObjectInsertMode(DocumentViewport::ObjectInsertMode::Link);
-            }
-        }
-    });
-    createShortcut("object.mode_text", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->currentTool() == ToolType::ObjectSelect) {
-                vp->setObjectInsertMode(DocumentViewport::ObjectInsertMode::Text);
-            }
-        }
-    });
-    createShortcut("object.mode_create", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->currentTool() == ToolType::ObjectSelect) {
-                vp->setObjectActionMode(DocumentViewport::ObjectActionMode::Create);
-            }
-        }
-    });
-    createShortcut("object.mode_select", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->currentTool() == ToolType::ObjectSelect) {
-                vp->setObjectActionMode(DocumentViewport::ObjectActionMode::Select);
-            }
-        }
-    });
-    
-    // ===== Link Slots (delegated to viewport) =====
-    createShortcut("link.slot_1", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->currentTool() == ToolType::ObjectSelect) {
-                vp->activateLinkSlot(0);
-            }
-        }
-    });
-    createShortcut("link.slot_2", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->currentTool() == ToolType::ObjectSelect) {
-                vp->activateLinkSlot(1);
-            }
-        }
-    });
-    createShortcut("link.slot_3", [this]() {
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->currentTool() == ToolType::ObjectSelect) {
-                vp->activateLinkSlot(2);
-            }
-        }
-    });
+    // MAC.7: Z-order (bring_front/forward, send_backward/back), affinity
+    // (affinity_up/down/background), mode switching (mode_image/text/link/
+    // create/select), and link slots (slot_1/2/3) are now wired via
+    // wireQActionDispatchers() above and associated to this window via
+    // bindAction(). The macOS Tools > Object / Insert / Links submenus
+    // surface all 15. The 7 Z-order + Affinity items grey out via
+    // updateObjectActionsEnabled() when no object is selected or active
+    // tool is not ObjectSelect.
     
     // ===== OCR subtoolbar =====
-    // Each shortcut delegates to a public trigger method on OcrSubToolbar,
-    // which forwards to the same button-click path the UI already uses. This
-    // keeps one source of truth for button state / settings / signal emission.
-    createShortcut("ocr.scan_page", [this]() {
-        if (auto* st = m_toolbar ? m_toolbar->ocrSubToolbar() : nullptr)
-            st->triggerScanPage();
-    });
-    createShortcut("ocr.scan_all", [this]() {
-        if (auto* st = m_toolbar ? m_toolbar->ocrSubToolbar() : nullptr)
-            st->triggerScanAll();
-    });
-    createShortcut("ocr.auto_ocr", [this]() {
-        if (auto* st = m_toolbar ? m_toolbar->ocrSubToolbar() : nullptr)
-            st->toggleAutoOcr();
-    });
-    createShortcut("ocr.show_text", [this]() {
-        if (auto* st = m_toolbar ? m_toolbar->ocrSubToolbar() : nullptr)
-            st->toggleShowText();
-    });
-    createShortcut("ocr.snap_grid", [this]() {
-        if (auto* st = m_toolbar ? m_toolbar->ocrSubToolbar() : nullptr)
-            st->toggleSnapToGrid();
-    });
+    // MAC.6: ocr.scan_page / ocr.scan_all / ocr.auto_ocr / ocr.show_text /
+    // ocr.snap_grid are now wired via wireQActionDispatchers() above and
+    // associated to this window via bindAction(). The 3 toggles
+    // (auto_ocr, show_text, snap_grid) are made checkable + state-synced in
+    // the ocrST connect block below; menu checkmarks track the toolbar
+    // buttons through XxxToggled signals + the connectViewportScrollSignals
+    // re-sync that runs on every tab switch (the toolbar's restoreTabState
+    // blocks signals, so the explicit re-sync is required).
 
     // ===== Highlighter subtoolbar =====
-    // Style shortcuts drive the dropdown's QAction::trigger() path so the
-    // existing onAutoHighlightStyleTriggered() slot handles persistence,
-    // check-state, icon refresh, and autoHighlightStyleChanged emission.
-    // No current-tool gate: these set the globally persisted style, so users
-    // can pre-configure before switching to the Highlighter tool.
-    using HS = HighlighterSubToolbar::HighlightStyle;
-    createShortcut("highlighter.style_none", [this]() {
-        if (auto* st = m_toolbar ? m_toolbar->highlighterSubToolbar() : nullptr)
-            st->selectAutoHighlightStyleFromShortcut(HS::None);
-    });
-    createShortcut("highlighter.style_cover", [this]() {
-        if (auto* st = m_toolbar ? m_toolbar->highlighterSubToolbar() : nullptr)
-            st->selectAutoHighlightStyleFromShortcut(HS::Cover);
-    });
-    createShortcut("highlighter.style_underline", [this]() {
-        if (auto* st = m_toolbar ? m_toolbar->highlighterSubToolbar() : nullptr)
-            st->selectAutoHighlightStyleFromShortcut(HS::Underline);
-    });
-    createShortcut("highlighter.style_dotted", [this]() {
-        if (auto* st = m_toolbar ? m_toolbar->highlighterSubToolbar() : nullptr)
-            st->selectAutoHighlightStyleFromShortcut(HS::DottedUnderline);
-    });
-    createShortcut("highlighter.toggle_source", [this]() {
-        if (auto* st = m_toolbar ? m_toolbar->highlighterSubToolbar() : nullptr)
-            st->toggleSelectionSourceFromShortcut();
-    });
+    // MAC.7: highlighter.style_none / cover / underline / dotted /
+    // toggle_source are now wired via wireQActionDispatchers() above and
+    // associated to this window via bindAction(). The macOS Tools >
+    // Highlighter Style submenu surfaces all 5.
 
     // Connect to ShortcutManager's change signal for dynamic updates
     connect(sm, &ShortcutManager::shortcutChanged,
@@ -2632,6 +2662,16 @@ void MainWindow::connectViewportScrollSignals(DocumentViewport* viewport) {
         if (m_actionBarContainer) {
             m_actionBarContainer->onToolChanged(tool);
         }
+
+        // MAC.7: re-evaluate object Z-order + affinity menu enable state.
+        // Switching away from ObjectSelect must grey them; switching to
+        // ObjectSelect must re-enable iff there's already a selection.
+        //
+        // MAC.7 review fix: gate on isActiveWindow() — the QActions are
+        // app-global so a background window changing its tool would otherwise
+        // overwrite the active window's state. The activation handler
+        // re-syncs when focus returns.
+        if (isActiveWindow()) updateObjectActionsEnabled();
     });
     
     // Phase D: Connect straight line mode sync (viewport → toolbar)
@@ -2710,10 +2750,17 @@ void MainWindow::connectViewportScrollSignals(DocumentViewport* viewport) {
     m_selectionChangedConn = connect(viewport, &DocumentViewport::objectSelectionChanged,
                                      this, [this, viewport]() {
         updateLinkSlotButtons(viewport);
+        // MAC.7: re-evaluate object Z-order + affinity menu enable state.
+        // MAC.7 review fix: gate on isActiveWindow() so background-window
+        // selection changes don't pollute the active window's QAction states.
+        if (isActiveWindow()) updateObjectActionsEnabled();
     });
     
     // Also sync the current selection state to the subtoolbar
     updateLinkSlotButtons(viewport);
+    // MAC.7: initial sync for the new viewport's selection / tool state.
+    // MAC.7 review fix: same isActiveWindow gate as the signal handlers above.
+    if (isActiveWindow()) updateObjectActionsEnabled();
     
     // =========================================================================
     // Action Bar: Connect selection state signals to ActionBarContainer
@@ -3003,6 +3050,22 @@ void MainWindow::connectViewportScrollSignals(DocumentViewport* viewport) {
             ocrST->blockSignals(true);
             ocrST->setSnapToGridChecked(doc->ocrSnapToBackground);
             ocrST->blockSignals(false);
+        }
+
+        // MAC.6: Re-sync the 3 checkable OCR menu QActions from the toolbar.
+        // Both the restoreTabState path (Toolbar::onTabChanged ->
+        // OcrSubToolbar::restoreTabState) and the setSnapToGridChecked block
+        // above use blockSignals(true), so the user-driven sync edges set up
+        // in the ocrST connect block of setupConnections() never fire on a
+        // tab switch. Without this re-sync the menu checkmarks would stay
+        // pinned to whatever the previously-active tab's state was.
+        //
+        // MAC.6 review fix: gate on isActiveWindow() so a background window's
+        // tab switch (e.g. from a programmatic open) doesn't overwrite the
+        // active window's QAction checked state. The activation handler in
+        // changeEvent re-seeds when focus returns.
+        if (isActiveWindow()) {
+            syncOcrCheckActions();
         }
 
         // OCR: Sync language for the new document
@@ -4436,6 +4499,16 @@ void MainWindow::changeEvent(QEvent *event) {
         } else {
             sm->setActiveDocumentScope(ShortcutManager::Scope::Global);
         }
+        // MAC.7: re-sync the 7 object Z-order + affinity QActions to the
+        // newly-active window's selection state. The QActions are app-global
+        // (owned by ShortcutManager), so switching focus between two windows
+        // with different selections must update their enable state here.
+        updateObjectActionsEnabled();
+        // MAC.6 review fix: same multi-window concern for the 3 checkable
+        // OCR menu QActions. Without this, switching from window A (auto-OCR
+        // on) to window B (auto-OCR off) would leave the menu checkmark
+        // showing A's state until B's user toggled something.
+        syncOcrCheckActions();
     }
 
     // Keep the nav bar's fullscreen toggle in sync with the actual window
@@ -5421,6 +5494,35 @@ void MainWindow::connectSubToolbarSignals()
             doc->modified = true;
         }
     });
+
+    // ----- MAC.6: Checkable QAction sync for OCR toggles -----
+    // Make the 3 toggle QActions checkable, seed their initial state from the
+    // toolbar, and connect the user-driven sync edge (toolbar -> QAction).
+    // The recursion concern (menu -> toggle -> XxxToggled -> setChecked back
+    // onto the QAction -> would it re-trigger the menu?) is benign: Qt's
+    // QAction::setChecked compares against the current value and skips
+    // emitting toggled() when unchanged, so no feedback loop.
+    //
+    // Tab switches go through a separate re-sync edge in
+    // connectViewportScrollSignals() because OcrSubToolbar::restoreTabState()
+    // uses blockSignals(true) when it flips button states across tabs, so the
+    // XxxToggled connect above wouldn't fire there.
+    auto* sm = ShortcutManager::instance();
+    if (auto* a = sm->action("ocr.auto_ocr")) {
+        a->setCheckable(true);
+        a->setChecked(ocrST->isAutoOcrEnabled());
+        connect(ocrST, &OcrSubToolbar::autoOcrToggled, a, &QAction::setChecked);
+    }
+    if (auto* a = sm->action("ocr.show_text")) {
+        a->setCheckable(true);
+        a->setChecked(ocrST->isShowTextEnabled());
+        connect(ocrST, &OcrSubToolbar::showTextToggled, a, &QAction::setChecked);
+    }
+    if (auto* a = sm->action("ocr.snap_grid")) {
+        a->setCheckable(true);
+        a->setChecked(ocrST->isSnapToGridEnabled());
+        connect(ocrST, &OcrSubToolbar::snapToGridToggled, a, &QAction::setChecked);
+    }
 }
 
 // ============================================================================
@@ -6514,6 +6616,113 @@ OcrSnapParams MainWindow::buildOcrSnapParams(Document* doc, Page* page) const
     snap.backgroundIsGrid = (page->backgroundType == Page::BackgroundType::Grid);
     snap.backgroundIsLines = (page->backgroundType == Page::BackgroundType::Lines);
     return snap;
+}
+
+// MAC.7: Sync the 7 selection-gated object QActions' enabled state to the
+// active viewport. Called from connectViewportScrollSignals (initial + via
+// the existing m_toolChangedConn / m_selectionChangedConn lambdas), from
+// MainWindow::changeEvent's ActivationChange branch (multi-window sync), and
+// once after binding in setupManagedShortcuts (initial state on startup).
+//
+// ShortcutManager owns the QActions so they live across all MainWindows; the
+// "active window's selection" semantics are realized by always reading
+// MainWindow::activeMainWindow() / its currentViewport() at update time.
+// Reading from `this` is OK here because every call site is reached only on
+// behalf of the now-active window (tab switch, activation change, etc.).
+//
+// Insert mode + link slot QActions stay always-enabled; their inline gate in
+// the wire handler keeps them silent no-ops on the wrong tool. See plan's
+// "Out of scope" note for the rationale.
+void MainWindow::updateObjectActionsEnabled()
+{
+    auto* sm = ShortcutManager::instance();
+    if (!sm) return;
+    auto* vp = currentViewport();
+    const bool isObjSel = vp && vp->currentTool() == ToolType::ObjectSelect;
+    const bool hasSel   = isObjSel && vp->hasSelectedObjects();
+    static const QStringList kSelGated = {
+        QStringLiteral("object.bring_front"),
+        QStringLiteral("object.bring_forward"),
+        QStringLiteral("object.send_backward"),
+        QStringLiteral("object.send_back"),
+        QStringLiteral("object.affinity_up"),
+        QStringLiteral("object.affinity_down"),
+        QStringLiteral("object.affinity_background"),
+    };
+    for (const QString& id : kSelGated) {
+        if (auto* a = sm->action(id)) a->setEnabled(hasSel);
+    }
+}
+
+// MAC.6 review fix: Re-seed the 3 checkable OCR QActions' checked state from
+// this window's OcrSubToolbar button state.
+//
+// Two call sites:
+//   - connectViewportScrollSignals: tab switches inside this window flip the
+//     toolbar buttons via OcrSubToolbar::restoreTabState() which uses
+//     blockSignals(true), so the user-driven autoOcrToggled / showTextToggled /
+//     snapToGridToggled edges in setupConnections never fire here. Without
+//     this re-sync the menu checkmarks would stay pinned to the previous
+//     tab's state.
+//   - changeEvent::ActivationChange: the QActions are owned by the
+//     ShortcutManager singleton (app-global), so two MainWindows toggling
+//     their respective toolbars race for the same checked state. Re-seed on
+//     activation so the menu always reflects the now-foreground window.
+void MainWindow::syncOcrCheckActions()
+{
+    if (!m_toolbar) return;
+    auto* ocrST = m_toolbar->ocrSubToolbar();
+    if (!ocrST) return;
+    auto* sm = ShortcutManager::instance();
+    if (!sm) return;
+    if (auto* a = sm->action(QStringLiteral("ocr.auto_ocr")))
+        a->setChecked(ocrST->isAutoOcrEnabled());
+    if (auto* a = sm->action(QStringLiteral("ocr.show_text")))
+        a->setChecked(ocrST->isShowTextEnabled());
+    if (auto* a = sm->action(QStringLiteral("ocr.snap_grid")))
+        a->setChecked(ocrST->isSnapToGridEnabled());
+}
+
+// MAC.6: Lock every unlocked OCR-text object on the active page (paged docs)
+// or every loaded tile (edgeless docs). Body lifted verbatim from the inline
+// lambda that previously lived in setupUi()'s overflow menu connect, so the
+// new macOS OCR menu and the legacy overflow menu share one implementation.
+void MainWindow::lockAllOcrText()
+{
+    DocumentViewport* vp = currentViewport();
+    if (!vp || !vp->document()) return;
+
+    auto lockOnPage = [](Page* page) -> QVector<QString> {
+        QVector<QString> ids;
+        if (!page) return ids;
+        for (const auto& obj : page->objects) {
+            if (obj->type() == QStringLiteral("ocr_text")) {
+                auto* ocr = static_cast<OcrTextObject*>(obj.get());
+                if (!ocr->ocrLocked) {
+                    ocr->ocrLocked = true;
+                    ids.append(ocr->id);
+                }
+            }
+        }
+        return ids;
+    };
+
+    QVector<QString> lockedIds;
+    Document* doc = vp->document();
+    if (doc->isEdgeless()) {
+        for (auto coord : doc->allLoadedTileCoords()) {
+            Page* tile = doc->getTile(coord.first, coord.second);
+            lockedIds += lockOnPage(tile);
+        }
+    } else {
+        Page* page = doc->page(vp->currentPageIndex());
+        lockedIds = lockOnPage(page);
+    }
+
+    if (!lockedIds.isEmpty()) {
+        vp->pushOcrLockUndo(lockedIds, true);
+        vp->update();
+    }
 }
 
 void MainWindow::showOcrLanguageDialog()

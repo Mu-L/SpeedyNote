@@ -386,7 +386,32 @@ private slots:
     void deletePageInDocument();  // Phase 3B: Delete current page (Ctrl+Shift+D)
     void openPdfDocument(const QString &filePath = QString());       // doc-1.4: Open PDF file (Ctrl+Shift+O)
     bool isDarkMode();
- 
+
+    // MAC.6: promoted from private: to private slots: so MacMenuBar can
+    // dispatch to them via QMetaObject::invokeMethod (matches the MAC.3
+    // showPdfRelinkDialog pattern). lockAllOcrText() is a new slot factored
+    // out of the inline lambda previously living in setupUi()'s overflow
+    // menu; the overflow now calls it directly so the macOS OCR menu and
+    // the overflow menu share one implementation.
+    void showOcrLanguageDialog();
+    void lockAllOcrText();
+
+    // MAC.7: Sync the 7 object Z-order + affinity QActions' enabled state to
+    // the active viewport's currentTool() == ObjectSelect && hasSelectedObjects().
+    // Called from connectViewportScrollSignals (extends the existing
+    // m_toolChangedConn / m_selectionChangedConn lambdas), from changeEvent's
+    // ActivationChange branch, and once after binding in setupManagedShortcuts.
+    void updateObjectActionsEnabled();
+
+    // MAC.6 review fix: Push this window's OcrSubToolbar button states onto
+    // the 3 checkable OCR QActions. Called from connectViewportScrollSignals
+    // after a tab switch (toolbar's restoreTabState uses blockSignals so the
+    // user-driven sync edge in setupConnections doesn't fire) and from
+    // changeEvent's ActivationChange branch (multi-window: the QActions are
+    // app-global, so switching focus between two MainWindows whose toolbars
+    // disagree must re-seed the menu checkmarks from the now-active window).
+    void syncOcrCheckActions();
+
 private:
 
     /**
@@ -752,7 +777,7 @@ private:
     void syncOcrTextObjects(Page* page, const QVector<OcrTextBlock>& blocks);
     void setOcrTextVisibility(bool visible);
     void setOcrConfidenceVisibility(bool enabled);
-    void showOcrLanguageDialog();
+    // MAC.6: showOcrLanguageDialog() promoted to private slots: above.
     QString resolveOcrLanguage(Document* doc) const;
     OcrSnapParams buildOcrSnapParams(Document* doc, Page* page) const;
     

@@ -64,12 +64,17 @@ MacMenuBar::MacMenuBar(QObject* parent) : QObject(parent)
     m_helpMenu     = m_menuBar->addMenu(tr("&Help"));
 
     buildAppMenu();
-    buildWindowMenu();
     populateFileMenu();      // MAC.3
     populateHelpMenu();      // MAC.3
     populateEditMenu();      // MAC.4
     populateDocumentMenu();  // MAC.4
     populateViewMenu();      // MAC.5
+    populateToolsMenu();     // MAC.7 (called between View and OCR so the
+                             // top-level menu bar order matches the QA
+                             // layout: App / File / Edit / View / Document
+                             // / Tools / OCR / Window / Help)
+    populateOcrMenu();       // MAC.6
+    populateWindowMenu();    // MAC.6
 }
 
 // ============================================================================
@@ -112,21 +117,6 @@ void MacMenuBar::buildAppMenu()
     // Quit / Hide SpeedyNote / Hide Others / Show All / Services submenu are
     // contributed automatically by Qt on macOS. Per QA Q3.3, About Qt is
     // intentionally NOT exposed.
-}
-
-// ============================================================================
-// Window menu — Minimize/Zoom auto-provided by Qt on macOS
-// ============================================================================
-
-void MacMenuBar::buildWindowMenu()
-{
-    // Qt 6 contributes Minimize / Zoom / "Bring All to Front" / open-windows
-    // list automatically for the macOS Window menu when the menu bar is
-    // installed as the system menu bar. Tab navigation (Next Tab / Previous
-    // Tab) is added in MAC.6.
-    //
-    // If a future Qt version stops auto-providing these, add them manually
-    // with QAction::WindowMenuRole.
 }
 
 // ============================================================================
@@ -348,6 +338,161 @@ void MacMenuBar::populateViewMenu()
     m_viewMenu->addSeparator();
     add(m_viewMenu, "view.debug_overlay");
 #endif
+}
+
+// ============================================================================
+// MAC.7: Tools menu — 6 direct tool items + 5 submenus per QA Q4.5
+// ============================================================================
+
+void MacMenuBar::populateToolsMenu()
+{
+    auto* sm = ShortcutManager::instance();
+    auto add = [sm](QMenu* menu, const QString& id) {
+        if (auto* a = sm->action(id)) menu->addAction(a);
+    };
+
+    // Direct items: tool selection. tool.pan (H, hold-to-activate) is
+    // intentionally omitted per QA Q4.5 — it is not menu-friendly. The
+    // existing event-filter path at MainWindow::eventFilter handles the
+    // hold-and-release semantics.
+    add(m_toolsMenu, "tool.pen");
+    add(m_toolsMenu, "tool.marker");
+    add(m_toolsMenu, "tool.highlighter");
+    add(m_toolsMenu, "tool.eraser");
+    add(m_toolsMenu, "tool.lasso");
+    add(m_toolsMenu, "tool.object_select");
+    m_toolsMenu->addSeparator();
+
+    // Submenu 1: Highlighter Style — 4 mutually-exclusive auto-style items
+    // followed by a separator and the PDF/OCR source toggle. The styles are
+    // not made checkable here (toolbar dropdown shows the active style; QA
+    // Q4.5 doesn't request checkmarks). Could be added as a QActionGroup in
+    // a follow-up if desired.
+    QMenu* hl = m_toolsMenu->addMenu(tr("Highlighter Style"));
+    add(hl, "highlighter.style_none");
+    add(hl, "highlighter.style_cover");
+    add(hl, "highlighter.style_underline");
+    add(hl, "highlighter.style_dotted");
+    hl->addSeparator();
+    add(hl, "highlighter.toggle_source");
+
+    // Submenu 2: Insert — Object Select tool's insert-mode + action-mode
+    // shortcuts. Inline gate inside each handler ensures these are silent
+    // no-ops when the active tool is not ObjectSelect; we keep them always-
+    // enabled in the menu to keep MAC.7 scope tight (see plan's Out of Scope).
+    QMenu* ins = m_toolsMenu->addMenu(tr("Insert"));
+    add(ins, "object.mode_image");
+    add(ins, "object.mode_text");
+    add(ins, "object.mode_link");
+    add(ins, "object.mode_create");
+    add(ins, "object.mode_select");
+
+    // Submenu 3: Object — Z-order (4 items) + separator + Affinity (3 items).
+    // All 7 grey out via MainWindow::updateObjectActionsEnabled() when the
+    // active viewport's tool is not ObjectSelect or no objects are selected.
+    QMenu* obj = m_toolsMenu->addMenu(tr("Object"));
+    add(obj, "object.bring_front");
+    add(obj, "object.bring_forward");
+    add(obj, "object.send_backward");
+    add(obj, "object.send_back");
+    obj->addSeparator();
+    add(obj, "object.affinity_up");
+    add(obj, "object.affinity_down");
+    add(obj, "object.affinity_background");
+
+    // Submenu 4: Layers — 6 items. layer.toggle_visibility's macOS shortcut
+    // (Cmd+;) was rebound from the cross-platform Cmd+, in MAC.1 to avoid
+    // colliding with the Settings shortcut, so the menu displays Cmd+;
+    // automatically via the registry.
+    QMenu* lay = m_toolsMenu->addMenu(tr("Layers"));
+    add(lay, "layer.new");
+    add(lay, "layer.toggle_visibility");
+    add(lay, "layer.select_all");
+    add(lay, "layer.select_top");
+    add(lay, "layer.select_bottom");
+    add(lay, "layer.merge");
+
+    // Submenu 5: Links — 3 link slot activations. Inline gate ensures these
+    // only fire / take effect when the Object Select tool is active.
+    QMenu* lnk = m_toolsMenu->addMenu(tr("Links"));
+    add(lnk, "link.slot_1");
+    add(lnk, "link.slot_2");
+    add(lnk, "link.slot_3");
+}
+
+// ============================================================================
+// MAC.6: OCR menu — Scan + checkable toggles + standalone OCR Language / Lock
+// ============================================================================
+
+void MacMenuBar::populateOcrMenu()
+{
+    auto* sm = ShortcutManager::instance();
+    auto add = [sm](QMenu* menu, const QString& id) {
+        if (auto* a = sm->action(id)) menu->addAction(a);
+    };
+
+    // Group 1: Scan + Auto OCR.
+    // ocr.auto_ocr is a checkable toggle (made checkable + state-synced in
+    // MainWindow's setupConnections ocrST block per MAC.6) and lives in this
+    // group rather than the toggle group because the QA structure pairs it
+    // with the Scan items; it still renders a checkmark.
+    add(m_ocrMenu, "ocr.scan_page");
+    add(m_ocrMenu, "ocr.scan_all");
+    add(m_ocrMenu, "ocr.auto_ocr");
+    m_ocrMenu->addSeparator();
+
+    // Group 2: Display toggles. Both checkable; menu-checkmark sync is wired
+    // at the MainWindow side so it follows toolbar / shortcut / tab-switch
+    // changes alike.
+    add(m_ocrMenu, "ocr.show_text");
+    add(m_ocrMenu, "ocr.snap_grid");
+    m_ocrMenu->addSeparator();
+
+    // Group 3: Standalone items (no shortcut, no ShortcutManager registration).
+    // Per QA Q4.6 these mirror the legacy overflow-menu pair. Both dispatch
+    // to private slots on the active MainWindow via QMetaObject::invokeMethod
+    // (same pattern as the MAC.3 "Relink PDF..." item) so MacMenuBar stays
+    // outside MainWindow's class boundary.
+    QAction* langAction = m_ocrMenu->addAction(tr("OCR Language..."));
+    connect(langAction, &QAction::triggered, this, []() {
+        if (auto* mw = MainWindow::activeMainWindow()) {
+            QMetaObject::invokeMethod(mw, "showOcrLanguageDialog",
+                                      Qt::DirectConnection);
+        }
+    });
+
+    QAction* lockAction = m_ocrMenu->addAction(tr("Lock All OCR Text"));
+    connect(lockAction, &QAction::triggered, this, []() {
+        if (auto* mw = MainWindow::activeMainWindow()) {
+            QMetaObject::invokeMethod(mw, "lockAllOcrText",
+                                      Qt::DirectConnection);
+        }
+    });
+}
+
+// ============================================================================
+// MAC.6: Window menu — Next Tab / Previous Tab + Qt auto-contributed items
+// ============================================================================
+
+void MacMenuBar::populateWindowMenu()
+{
+    auto* sm = ShortcutManager::instance();
+    auto add = [sm](QMenu* menu, const QString& id) {
+        if (auto* a = sm->action(id)) menu->addAction(a);
+    };
+
+    // Qt 6 contributes Minimize (Cmd+M), Zoom, "Bring All to Front", and the
+    // open-windows list to the macOS Window menu automatically when the
+    // parent-less QMenuBar is installed as the system menu bar. Our manual
+    // additions sit between Qt's defaults and (eventually) the auto-injected
+    // open-windows list, separated by a leading separator for visual grouping
+    // per QA Q4.7.
+    //
+    // If a future Qt version stops auto-providing these, add them manually
+    // with QAction::WindowMenuRole.
+    m_windowMenu->addSeparator();
+    add(m_windowMenu, "navigation.next_tab");
+    add(m_windowMenu, "navigation.prev_tab");
 }
 
 #endif // Q_OS_MACOS

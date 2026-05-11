@@ -49,12 +49,14 @@ private:
     explicit MacMenuBar(QObject* parent = nullptr);
 
     void buildAppMenu();      // About + Settings (Quit/Hide auto-provided by Qt)
-    void buildWindowMenu();   // Minimize/Zoom (Qt auto-provides on macOS)
     void populateFileMenu();      // MAC.3: New/Open/Save/Save As/Export/Close + Relink PDF
     void populateHelpMenu();      // MAC.3: Keyboard Shortcuts + Visit GitHub + Report a Bug
     void populateEditMenu();      // MAC.4: Undo/Redo + Cut/Copy/Paste/Delete + Find
     void populateDocumentMenu();  // MAC.4: Add/Insert/Delete page (PagedOnly auto-disable)
     void populateViewMenu();      // MAC.5: Zoom + page nav (PagedOnly) + edgeless nav (EdgelessOnly) + layout + panes + fullscreen
+    void populateToolsMenu();     // MAC.7: 6 direct tools + 5 submenus (Highlighter Style / Insert / Object / Layers / Links)
+    void populateOcrMenu();       // MAC.6: Scan + checkable toggles + OCR Language / Lock All OCR Text
+    void populateWindowMenu();    // MAC.6: Next Tab / Previous Tab (Qt auto-provides Minimize / Zoom / Bring All to Front / open-windows list)
 
     static MacMenuBar* s_instance;
 
