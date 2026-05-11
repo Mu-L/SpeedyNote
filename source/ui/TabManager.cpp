@@ -283,14 +283,22 @@ void TabManager::setTabTitle(int index, const QString& title)
     if (!m_tabBar || index < 0 || index >= m_baseTitles.size()) {
         return;
     }
-    
+
+    if (m_baseTitles.at(index) == title) {
+        return;  // No-op: avoid spurious currentTabDisplayChanged emits.
+    }
+
     m_baseTitles[index] = title;
-    
+
     // Update display title (with or without * prefix)
     if (m_modifiedFlags.at(index)) {
         m_tabBar->setTabText(index, QStringLiteral("* ") + title);
     } else {
         m_tabBar->setTabText(index, title);
+    }
+
+    if (index == m_tabBar->currentIndex()) {
+        emit currentTabDisplayChanged();
     }
 }
 
@@ -314,6 +322,10 @@ void TabManager::markTabModified(int index, bool modified)
     } else {
         m_tabBar->setTabText(index, baseTitle);
     }
+
+    if (index == m_tabBar->currentIndex()) {
+        emit currentTabDisplayChanged();
+    }
 }
 
 QString TabManager::tabTitle(int index) const
@@ -322,6 +334,14 @@ QString TabManager::tabTitle(int index) const
         return QString();
     }
     return m_baseTitles.at(index);
+}
+
+bool TabManager::isTabModified(int index) const
+{
+    if (index < 0 || index >= m_modifiedFlags.size()) {
+        return false;
+    }
+    return m_modifiedFlags.at(index);
 }
 
 // ============================================================================

@@ -412,6 +412,24 @@ private slots:
     // disagree must re-seed the menu checkmarks from the now-active window).
     void syncOcrCheckActions();
 
+    /**
+     * @brief Refresh the OS window title and NavigationBar filename label.
+     *
+     * Single source of truth for both. Reads the active pane's current tab
+     * (display name + modified flag) and applies a platform-appropriate
+     * format:
+     *   - macOS: "<doc>[*]" (Apple HIG; bullet + close-button "edited" dot
+     *     come from setWindowModified). Also calls setWindowFilePath() so
+     *     the title bar gets the document proxy icon.
+     *   - Other:  "<doc>[*] \xE2\x80\x94 SpeedyNote".
+     *   - No doc: just "SpeedyNote", with setWindowModified(false).
+     *
+     * Connected to SplitViewManager::activeViewportChanged (active pane /
+     * tab switches) and TabManager::currentTabDisplayChanged (rename,
+     * markTabModified flips on the current tab).
+     */
+    void updateWindowTitle();
+
 private:
 
     /**
