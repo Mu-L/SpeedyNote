@@ -1523,16 +1523,23 @@ void MainWindow::setupUi() {
 // Keyboard Shortcut Hub: Setup and Management
 // ============================================================================
 
-// MAC.3: Wire singleton QAction triggered() signals to handlers via the
-// active-MainWindow dispatch. This runs ONCE per process (guarded by a static
-// flag) so multi-window setups never get double-fire on a single keystroke.
+// Wire every registry QAction's triggered() signal to its handler, dispatched
+// through MainWindow::activeMainWindow() so multi-window setups behave
+// correctly. Runs ONCE per process (guarded by a static flag) so two
+// MainWindows never double-fire on a single keystroke.
 //
-// Migration recipe for MAC.4-7: add new wire("category.action", lambda) calls
-// here AND remove the corresponding createShortcut() in setupManagedShortcuts()
-// AND add a bindAction("category.action") in setupManagedShortcuts(). The
-// canonical flow is:
+// Recipe for adding a new shortcut:
+//   1. Register the action id + default shortcut in ShortcutManager::registerDefaults().
+//   2. Add a wire("category.action", [](MainWindow* w){ ... }) call below.
+//   3. Add a bindAction("category.action") in setupManagedShortcuts() so the
+//      action's shortcut is registered against this MainWindow's shortcut map.
+//   4. (Optional, macOS) Add the QAction to the appropriate menu in
+//      source/macos/MacMenuBar.cpp via the local `add(menu, "category.action")`
+//      helper — the QAction carries its own shortcut display.
+//
+// Canonical event flow:
 //   keystroke -> Qt shortcut map (active window) -> QAction::triggered ->
-//   dispatcher slot (here) -> activeMainWindow() -> handler.
+//   dispatcher slot (here) -> activeMainWindow() -> handler lambda.
 void MainWindow::wireQActionDispatchers()
 {
     static bool s_wired = false;
@@ -2128,97 +2135,56 @@ void MainWindow::setupManagedShortcuts()
     bindAction("link.slot_2");
     bindAction("link.slot_3");
 
-    // MAC.7: Seed the object Z-order + affinity QActions' enable state on
-    // first window construction. The viewport-level connects in
+    // Seed the object Z-order + affinity QActions' enable state on first
+    // window construction. The viewport-level connects in
     // connectViewportScrollSignals also call this, but those only run after
-    // a viewport is added; this initial pass guarantees a sane baseline if
+    // a viewport is added; this initial pass guarantees a sane baseline when
     // no viewport exists yet (e.g. fresh window with launcher visible).
     updateObjectActionsEnabled();
 
-    // Helper lambda to create and register a managed shortcut
-    auto createShortcut = [this, sm](const QString& actionId, 
-                                      std::function<void()> callback,
-                                      Qt::ShortcutContext context = Qt::ApplicationShortcut) {
-        QKeySequence seq = sm->keySequenceForAction(actionId);
-        QShortcut* shortcut = new QShortcut(seq, this);
-        shortcut->setContext(context);
-        connect(shortcut, &QShortcut::activated, this, callback);
-        m_managedShortcuts.insert(actionId, shortcut);
-    };
-    
-    // ===== File Operations =====
-    // MAC.3: file.save / file.save_as / file.new_paged / file.new_edgeless /
-    // file.open_pdf / file.open_notebook / file.close_tab / file.export /
-    // file.export_pdf are now wired via wireQActionDispatchers() above and
-    // associated to this window via bindAction(). No createShortcut needed.
-
-    // ===== Document/Page Operations =====
-    // MAC.4: document.add_page / insert_page / delete_page are now wired via
-    // wireQActionDispatchers() above and associated to this window via bindAction().
-    
-    // ===== Navigation =====
-    // MAC.5: navigation.launcher is now wired via wireQActionDispatchers()
-    // above and associated to this window via bindAction().
-    createShortcut("navigation.escape", [this]() {
-        // Only process if no modal dialog is open
-        if (QApplication::activeModalWidget()) {
-            return;
-        }
-        
-        // First, close PDF search bar if it's open
-        if (m_pdfSearchBar && m_pdfSearchBar->isVisible()) {
-            hidePdfSearchBar();
-            return;
-        }
-
-        // Phase 2B: Close floating text editor if open
-        if (m_floatingTextEditor && m_floatingTextEditor->isVisible()) {
-            m_floatingTextEditor->closeEditor();
-            return;
-        }
-
-        // Next, let the current viewport try to handle Escape
-        // (cancel lasso selection, deselect objects, cancel text selection)
-        if (DocumentViewport* vp = currentViewport()) {
-            if (vp->handleEscapeKey()) {
-                // Viewport handled Escape (cancelled something)
+    // ===== Escape — multi-priority dismissal =====
+    //
+    // The only remaining hand-rolled QShortcut. Kept out of the QAction
+    // registry because:
+    //  - it doesn't appear in any menu (modal-style dismissal, not a command);
+    //  - its handler walks a per-window priority list (modal -> search bar ->
+    //    floating editor -> viewport -> launcher) that doesn't fit the
+    //    activeMainWindow() dispatch model;
+    //  - it uses Qt::WindowShortcut (the dispatcher pattern uses
+    //    Qt::ApplicationShortcut), so each window must own its own QShortcut
+    //    so Escape only dismisses things in the focused window.
+    //
+    // onShortcutChanged() updates m_escapeShortcut's key sequence when the
+    // user remaps "navigation.escape" via Settings.
+    {
+        QKeySequence seq = sm->keySequenceForAction("navigation.escape");
+        m_escapeShortcut = new QShortcut(seq, this);
+        m_escapeShortcut->setContext(Qt::WindowShortcut);
+        connect(m_escapeShortcut, &QShortcut::activated, this, [this]() {
+            if (QApplication::activeModalWidget()) return;
+            if (m_pdfSearchBar && m_pdfSearchBar->isVisible()) {
+                hidePdfSearchBar();
                 return;
             }
-        }
-        
-        // Nothing to cancel in viewport - toggle to launcher
+            if (m_floatingTextEditor && m_floatingTextEditor->isVisible()) {
+                m_floatingTextEditor->closeEditor();
+                return;
+            }
+            if (DocumentViewport* vp = currentViewport()) {
+                if (vp->handleEscapeKey()) return;
+            }
             toggleLauncher();
-    }, Qt::WindowShortcut);  // WindowShortcut for Escape
-    // MAC.5: navigation.go_to_page is now wired via wireQActionDispatchers()
-    // above and associated to this window via bindAction(); the macOS View menu
-    // also surfaces it as 'Go to Page...'.
-    // MAC.6: navigation.next_tab / navigation.prev_tab moved to wireQActionDispatchers()
-    // (see the "Tab Navigation" comment block below). Pre-MAC.6 this line
-    // was a TODO; the migration completed it.
-
-    // ===== View =====
-    // MAC.5: view.debug_overlay / view.auto_layout / view.fullscreen /
-    // view.left_sidebar / view.right_sidebar / view.split_right /
-    // view.merge_panes / view.focus_left_pane / view.focus_right_pane are now
-    // wired via wireQActionDispatchers() above and associated to this window
-    // via bindAction(). The macOS View menu surfaces them as well.
-    
-    // ===== Application =====
-    // MAC.3: app.settings and app.keyboard_shortcuts are wired via
-    // wireQActionDispatchers() above. The platform fork that previously
-    // wrapped app.settings in #ifndef Q_OS_MACOS is no longer needed because
-    // the dispatcher pattern doesn't compete with the MacMenuBar's QAction
-    // (the MacMenuBar now only sets MenuRole and addAction; the connect lives
-    // in the dispatcher).
+        });
+    }
 
 #ifdef Q_OS_MACOS
+    // Alternate Cmd+K binding for Settings on macOS (per QA Q3.2 Option B).
+    // The primary binding (Cmd+,) lives on the registry QAction app.settings;
+    // this alternate is a hand-rolled QShortcut so users with cross-platform
+    // muscle memory keep the Ctrl/Cmd+K binding. Not registered with the
+    // registry: it has no display name, no remap support, and intentionally
+    // shadows whatever the user binds Cmd+K to elsewhere (per the QA decision).
     {
-        // MAC.1: Alternate Cmd+K binding for Settings on macOS (per QA Q3.2 Option B).
-        // The primary binding (Cmd+,) is provided by the registry QAction
-        // wired in wireQActionDispatchers(); this alternate is a hand-rolled
-        // QShortcut so existing macOS users (and anyone with cross-platform
-        // muscle memory) keep the Cmd+K binding. Intentionally outside the
-        // registry — see MAC.1 plan.
         auto* alt = new QShortcut(QKeySequence("Ctrl+K"), this);
         alt->setContext(Qt::ApplicationShortcut);
         connect(alt, &QShortcut::activated, this, [this]() {
@@ -2228,22 +2194,14 @@ void MainWindow::setupManagedShortcuts()
     }
 #endif
 
-    // MAC.4: app.find / app.find_next / app.find_prev are now wired via
-    // wireQActionDispatchers() above and associated to this window via bindAction().
-    
-    // ===== Export/Share =====
-    // MAC.3: file.export and file.export_pdf are wired via wireQActionDispatchers() above.
-
-    // ===== Tools (delegated to viewport) =====
-    // MAC.7: tool.pen / marker / highlighter / eraser / lasso / object_select
-    // are now wired via wireQActionDispatchers() above (using the wireToolKey
-    // helper which preserves the focus-check guard) and associated to this
-    // window via bindAction(). The macOS Tools menu surfaces the 6 items.
-
-    // Pan tool: H key hold handled via event filter, not QShortcut (need release detection)
-    // MAC.7: tool.pan stays out of the dispatcher — it is hold-to-activate.
-    // Read its key code once here to seed m_panHoldKey; onShortcutChanged
-    // updates it after user remaps via Settings.
+    // ===== Pan tool (H, hold-to-activate) =====
+    //
+    // tool.pan is the only registry id that's NOT wired via wireQActionDispatchers:
+    // the H key is hold-to-activate (release switches back to the previous
+    // tool), which the QShortcut/QAction model can't express. The hold/release
+    // semantics live in MainWindow::eventFilter; this block reads tool.pan's
+    // key code once into m_panHoldKey, and onShortcutChanged() keeps it
+    // updated after user remaps via Settings.
     {
         QKeySequence panSeq = sm->keySequenceForAction("tool.pan");
         if (!panSeq.isEmpty()) {
@@ -2254,91 +2212,22 @@ void MainWindow::setupManagedShortcuts()
 #endif
         }
     }
-    
-    // ===== Edit (delegated to viewport) =====
-    // MAC.4: edit.undo / edit.redo / edit.redo_alt are now wired via
-    // wireQActionDispatchers() above and associated to this window via bindAction().
-    
-    // ===== Home Key + Backspace (edgeless / paged split via scope) =====
-    // MAC.5: edgeless.home (EdgelessOnly) and navigation.first_page (PagedOnly)
-    // are now two separate scope-disjoint wires in wireQActionDispatchers().
-    // They both share the Home key, but ShortcutManager::setActiveDocumentScope()
-    // disables whichever doesn't apply to the active document, so Qt's shortcut
-    // router never sees an ambiguous overload. Same pattern for edgeless.go_back
-    // (EdgelessOnly Backspace -> goBackPosition); the pre-MAC.5 paged-doc
-    // Backspace-as-Delete fallback was intentionally dropped (use Delete key
-    // / edit.delete on paged docs instead). Both ids are bindAction'd below.
-    
-    // ===== Page Navigation (paged documents only) =====
-    // MAC.5: navigation.prev_page / next_page / first_page / last_page are now
-    // wired via wireQActionDispatchers() above (navigation.first_page is a
-    // brand-new wire that splits the Home key out of the old edgeless.home
-    // dispatch). All four are PagedOnly and bindAction'd below.
-    
-    // ===== Tab Navigation =====
-    // MAC.6: navigation.next_tab / navigation.prev_tab are now wired via
-    // wireQActionDispatchers() above and associated to this window via
-    // bindAction(). The macOS Window menu surfaces them per QA Q4.7.
-    // MAC.3: file.close_tab is wired via wireQActionDispatchers() above.
 
-    // ===== Zoom Shortcuts =====
-    // MAC.5: zoom.in / zoom.in_alt / zoom.out / zoom.fit / zoom.100 /
-    // zoom.fit_width are now wired via wireQActionDispatchers() above and
-    // associated to this window via bindAction(). The macOS View menu shows
-    // zoom.in (the primary, displays as Cmd+Shift+=); zoom.in_alt (Cmd+=)
-    // is intentionally not in the menu, alt binding only.
-    
-    // ===== Layer Operations =====
-    // MAC.7: layer.new / toggle_visibility / select_all / select_top /
-    // select_bottom / merge are now wired via wireQActionDispatchers() above
-    // and associated to this window via bindAction(). The macOS Tools >
-    // Layers submenu surfaces all 6.
-    
-    // ===== Context-Dependent Edit Operations (delegated to viewport) =====
-    // MAC.4: edit.copy / edit.cut / edit.paste / edit.delete are now wired via
-    // wireQActionDispatchers() above and associated to this window via bindAction().
-    // The dispatcher preserves the QTextBrowser focus fallback for Copy and the
-    // cross-viewport tool-override clear for Paste.
-    
-    // ===== Object Manipulation (delegated to viewport, ObjectSelect tool) =====
-    // MAC.7: Z-order (bring_front/forward, send_backward/back), affinity
-    // (affinity_up/down/background), mode switching (mode_image/text/link/
-    // create/select), and link slots (slot_1/2/3) are now wired via
-    // wireQActionDispatchers() above and associated to this window via
-    // bindAction(). The macOS Tools > Object / Insert / Links submenus
-    // surface all 15. The 7 Z-order + Affinity items grey out via
-    // updateObjectActionsEnabled() when no object is selected or active
-    // tool is not ObjectSelect.
-    
-    // ===== OCR subtoolbar =====
-    // MAC.6: ocr.scan_page / ocr.scan_all / ocr.auto_ocr / ocr.show_text /
-    // ocr.snap_grid are now wired via wireQActionDispatchers() above and
-    // associated to this window via bindAction(). The 3 toggles
-    // (auto_ocr, show_text, snap_grid) are made checkable + state-synced in
-    // the ocrST connect block below; menu checkmarks track the toolbar
-    // buttons through XxxToggled signals + the connectViewportScrollSignals
-    // re-sync that runs on every tab switch (the toolbar's restoreTabState
-    // blocks signals, so the explicit re-sync is required).
-
-    // ===== Highlighter subtoolbar =====
-    // MAC.7: highlighter.style_none / cover / underline / dotted /
-    // toggle_source are now wired via wireQActionDispatchers() above and
-    // associated to this window via bindAction(). The macOS Tools >
-    // Highlighter Style submenu surfaces all 5.
-
-    // Connect to ShortcutManager's change signal for dynamic updates
+    // Pick up live shortcut remaps via Settings. Registry QActions update
+    // themselves through ShortcutManager's internal connect; this slot only
+    // handles the two non-registry cases above (m_panHoldKey, m_escapeShortcut).
     connect(sm, &ShortcutManager::shortcutChanged,
             this, &MainWindow::onShortcutChanged);
-    
-#ifdef SPEEDYNOTE_DEBUG
-    qDebug() << "[MainWindow] Registered" << m_managedShortcuts.size() << "managed shortcuts";
-#endif
 }
 
 void MainWindow::onShortcutChanged(const QString& actionId, const QString& newShortcut)
 {
-    // Pan tool hold key is managed separately (not a QShortcut)
-    if (actionId == "tool.pan") {
+    // Registry QActions (the bulk of our shortcuts) keep themselves in sync
+    // via ShortcutManager's internal wiring. This slot only handles the two
+    // non-registry cases set up in setupManagedShortcuts():
+    //   - tool.pan        -> m_panHoldKey (hold-to-activate, no QShortcut)
+    //   - navigation.escape -> m_escapeShortcut (per-window QShortcut)
+    if (actionId == QLatin1String("tool.pan")) {
         QKeySequence seq(newShortcut);
         if (seq.isEmpty()) {
             m_panHoldKey = 0;
@@ -2351,17 +2240,8 @@ void MainWindow::onShortcutChanged(const QString& actionId, const QString& newSh
         }
         return;
     }
-    
-    // Update the QShortcut if we manage this action
-    auto it = m_managedShortcuts.find(actionId);
-    if (it != m_managedShortcuts.end()) {
-        QShortcut* shortcut = it.value();
-        QKeySequence newSeq(newShortcut);
-        shortcut->setKey(newSeq);
-        
-#ifdef SPEEDYNOTE_DEBUG
-        qDebug() << "[MainWindow] Updated shortcut:" << actionId << "->" << newShortcut;
-#endif
+    if (actionId == QLatin1String("navigation.escape") && m_escapeShortcut) {
+        m_escapeShortcut->setKey(QKeySequence(newShortcut));
     }
 }
 

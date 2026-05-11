@@ -25,7 +25,7 @@
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #endif
-#include <QShortcut>  // For m_managedShortcuts hash
+#include <QShortcut>  // For m_escapeShortcut + the macOS Cmd+K Settings alternate
 #include <memory>     // For std::unique_ptr
 // Note: ControlPanelDialog is included in MainWindow.cpp (Phase CP.1)
 #include <QLocalServer>
@@ -792,9 +792,18 @@ private:
     
     // Layout timers and separators - REMOVED MW4.3: No longer needed
     
-    // Keyboard Shortcut Hub: Managed shortcuts
-    QHash<QString, QShortcut*> m_managedShortcuts;
-    void setupManagedShortcuts();  // Initialize shortcuts from ShortcutManager
+    // Keyboard Shortcut Hub
+    //
+    // Almost every keyboard shortcut now lives on a registry QAction (owned
+    // by ShortcutManager, dispatched via wireQActionDispatchers). m_escapeShortcut
+    // is the lone exception — it's a per-window QShortcut because Escape
+    // dismissal walks a per-window priority list (modal -> search bar ->
+    // floating editor -> viewport -> launcher) that doesn't fit the
+    // activeMainWindow() dispatch model and needs Qt::WindowShortcut scope.
+    // setupManagedShortcuts() also installs an unnamed Cmd+K alternate for
+    // Settings on macOS (parent-owned by `this`, no separate handle needed).
+    QShortcut* m_escapeShortcut = nullptr;
+    void setupManagedShortcuts();  // Wires every registry QAction to this window plus the two non-registry cases above.
 
     // MAC.3: One-time, app-wide wiring of QAction triggered() signals to their
     // handlers via MainWindow::activeMainWindow() dispatch. Static so it runs
