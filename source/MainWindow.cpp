@@ -409,21 +409,13 @@ MainWindow::MainWindow(QWidget *parent)
             vp->setTouchGestureMode(effectiveMode);
         }
         
-        // Phase C.1.6 / MAC.8: Update OS title bar (visible on macOS where the
-        // NavigationBar is hidden) + NavigationBar filename (visible on other
-        // platforms) for the new active document.
-        //
-        // No-doc branch (vp/doc null): pass an empty name so syncDocumentTitle
-        // reverts the OS title bar to the SpeedyNote {version} brand. This
-        // matches the totalTabCountChanged(0) branch and the user's chosen UX
-        // (per QA: "revert to app brand when no doc is active"). It also
-        // covers the brief split-view-with-empty-pane transition where
-        // activeViewportChanged fires with vp=null but totalTabCountChanged
-        // does not (split-pane select with one pane empty before auto-merge).
-        if (vp && vp->document()) {
-            syncDocumentTitle(vp->document()->displayName());
-        } else {
-            syncDocumentTitle(QString());
+        // Phase C.1.6: Update NavigationBar with current document's filename
+        if (m_navigationBar) {
+            QString filename = tr("Untitled");
+            if (vp && vp->document()) {
+                filename = vp->document()->displayName();
+            }
+            m_navigationBar->setFilename(filename);
         }
         
         // Restore left sidebar tab selection for new document tab
@@ -447,24 +439,14 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     // Auto-hide the tab bar container when only one notebook is open.
-    // The manual override (last interaction wins until the next count
-    // transition) comes from the NavigationBar filename click on
-    // Linux/Windows and from view.toggle_tab_bar (View -> Toggle Tab Bar
-    // / Cmd+Shift+B) on macOS where the bar is hidden — see MAC.8.
+    // The filename click in NavigationBar still toggles visibility as a
+    // manual override (last interaction wins until the next count transition).
     if (QWidget* tbc = m_splitViewManager->tabBarContainer()) {
         tbc->setVisible(false);
     }
     connect(m_splitViewManager, &SplitViewManager::totalTabCountChanged, this, [this](int total) {
         if (QWidget* tbc = m_splitViewManager ? m_splitViewManager->tabBarContainer() : nullptr) {
             tbc->setVisible(total >= 2);
-        }
-        // MAC.8: When the user closes their last tab, the tabManager's
-        // currentTabChanged signal does not fire (no new "current" exists),
-        // so the existing handler at line ~414 cannot revert the title.
-        // Reset to the app brand here so the macOS OS title bar doesn't
-        // sit stuck on the just-closed document's name.
-        if (total == 0) {
-            syncDocumentTitle(QString());
         }
     });
 
@@ -646,7 +628,9 @@ MainWindow::MainWindow(QWidget *parent)
                 
                 tm->setTabTitle(index, doc->displayName());
                 tm->markTabModified(index, false);
-                syncDocumentTitle(doc->displayName());  // MAC.8: also refreshes OS title bar
+                if (m_navigationBar) {
+                    m_navigationBar->setFilename(doc->displayName());
+                }
             }
         }
         
@@ -1176,23 +1160,10 @@ void MainWindow::setupUi() {
 
     // =========================================================================
     // Phase A: NavigationBar (Toolbar Extraction)
-    //
-    // MAC.8: NavigationBar is constructed unconditionally on every platform
-    // so the 15+ existing state-setter callsites (setFullscreenChecked,
-    // setLeftSidebarChecked, setRightSidebarChecked, setFilename via
-    // syncDocumentTitle, updateTheme) remain cheap no-ops without needing
-    // null guards everywhere. On macOS we just don't insert it into the
-    // layout and we hide it, reclaiming the 44px for the document area.
-    // The macOS menu bar (MAC.2-MAC.7) covers 8/9 NavigationBar controls;
-    // the 9th (filename-click -> toggle tab bar) is now view.toggle_tab_bar.
     // =========================================================================
     m_navigationBar = new NavigationBar(this);
-    syncDocumentTitle(tr("Untitled"));
-#ifndef Q_OS_MACOS
+    m_navigationBar->setFilename(tr("Untitled"));
     mainLayout->addWidget(m_navigationBar);
-#else
-    m_navigationBar->setVisible(false);
-#endif
     
     // Connect NavigationBar signals
     connect(m_navigationBar, &NavigationBar::launcherClicked, this, &MainWindow::toggleLauncher);
@@ -1337,11 +1308,6 @@ void MainWindow::setupUi() {
             updateActionBarPosition();
         }
     });
-#ifndef Q_OS_MACOS
-    // MAC.8: NavigationBar is hidden on macOS so the menu button can't be
-    // clicked there; skip wiring the connect to keep the dead code out of
-    // the macOS build. The whole overflow menu is also redundant on macOS
-    // since the system menu bar covers all of its items.
     connect(m_navigationBar, &NavigationBar::menuRequested, this, [this]() {
         // Show overflow menu at menu button position
         if (overflowMenu && m_navigationBar) {
@@ -1349,7 +1315,6 @@ void MainWindow::setupUi() {
                 QPoint(m_navigationBar->width() - 10, m_navigationBar->height())));
         }
     });
-#endif
     // ------------------ End of NavigationBar signal connections ------------------
 
     // =========================================================================
@@ -1791,21 +1756,6 @@ void MainWindow::wireQActionDispatchers()
 
     // ----- layout / sidebars / launcher (MAC.5, Global) -----
     wire("navigation.launcher", [](MainWindow* w){ w->toggleLauncher(); });
-
-    // MAC.8: view.toggle_tab_bar replaces the pre-MAC.8 NavigationBar
-    // filename-click gesture (the only NavigationBar control without a
-    // menu-bar equivalent before MAC.8). The non-macOS filename-click
-    // connect at line ~1192 stays wired as the existing entry point on
-    // those platforms; on macOS the bar is hidden so the click signal
-    // cannot fire and this wire is the only path.
-    wire("view.toggle_tab_bar", [](MainWindow* w){
-        if (w->m_splitViewManager) {
-            if (QWidget* tbc = w->m_splitViewManager->tabBarContainer()) {
-                tbc->setVisible(!tbc->isVisible());
-            }
-        }
-    });
-
     wire("view.left_sidebar", [](MainWindow* w){
         if (w->m_leftSidebar && w->m_navigationBar) {
             const bool newState = !w->m_leftSidebar->isVisible();
@@ -2134,7 +2084,6 @@ void MainWindow::setupManagedShortcuts()
     bindAction("edgeless.home");
     bindAction("edgeless.go_back");
     bindAction("navigation.launcher");
-    bindAction("view.toggle_tab_bar");  // MAC.8
     bindAction("view.left_sidebar");
     bindAction("view.right_sidebar");
     bindAction("view.auto_layout");
@@ -3771,13 +3720,15 @@ void MainWindow::saveDocument()
         return;  // User cancelled or save failed
     }
     
-    // Update tab title and (MAC.8) OS title bar + NavigationBar via helper.
+    // Update tab title and NavigationBar
     int currentIndex = tabManager()->currentIndex();
     if (currentIndex >= 0) {
         tabManager()->setTabTitle(currentIndex, doc->name);
         tabManager()->markTabModified(currentIndex, false);
     }
-    syncDocumentTitle(doc->name);
+    if (m_navigationBar) {
+        m_navigationBar->setFilename(doc->name);
+    }
 }
 
 // MAC.3: "Save As..." entry point. Always prompts for a new path even if the
@@ -3786,10 +3737,9 @@ void MainWindow::saveDocument()
 // pipeline.
 //
 // Mirrors saveDocument()'s post-save flow (sync position before save; refresh
-// tab title + clear modified marker + propagate name through syncDocumentTitle
-// for the OS title bar and NavigationBar — MAC.8) so that after Save As the
-// UI reflects the new file name immediately, matching the existing-path
-// branch of saveDocument().
+// tab title + NavigationBar filename + clear modified marker after success)
+// so that after Save As the UI reflects the new file name immediately,
+// matching the existing-path branch of saveDocument().
 void MainWindow::saveDocumentAs()
 {
     if (!m_documentManager || !tabManager()) {
@@ -3815,35 +3765,8 @@ void MainWindow::saveDocumentAs()
         tabManager()->setTabTitle(currentIndex, doc->name);
         tabManager()->markTabModified(currentIndex, false);
     }
-    syncDocumentTitle(doc->name);
-}
-
-// MAC.8: Single source of truth for document-name -> NavigationBar +
-// window-title sync. Pre-MAC.8 every callsite that wanted to update the
-// active document's display name called m_navigationBar->setFilename(name)
-// directly, which only updated the in-window NavigationBar; the OS title
-// bar was set once at MainWindow construction (line ~246) and never
-// refreshed. With the NavigationBar hidden on macOS (per MAC.8), the OS
-// title bar is now the user's only on-screen filename indicator, so every
-// formerly-setFilename callsite routes through this helper.
-//
-// Empty name reverts the title bar to the SpeedyNote {version} brand
-// (used when SplitViewManager::totalTabCountChanged fires with total == 0
-// after the user closes their last tab); non-empty name pushes through to
-// both NavigationBar (no-op rendering on macOS, but keeps state in sync
-// for if/when the bar is re-shown) and setWindowTitle.
-void MainWindow::syncDocumentTitle(const QString& name)
-{
-    if (name.isEmpty()) {
-        setWindowTitle(tr("SpeedyNote %1").arg(APP_VERSION));
-        if (m_navigationBar) {
-            m_navigationBar->setFilename(tr("Untitled"));
-        }
-    } else {
-        setWindowTitle(name);
-        if (m_navigationBar) {
-            m_navigationBar->setFilename(name);
-        }
+    if (m_navigationBar) {
+        m_navigationBar->setFilename(doc->name);
     }
 }
 

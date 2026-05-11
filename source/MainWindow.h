@@ -440,15 +440,6 @@ private:
      * - For auto-save/close: mark modified so the document gets saved
      */
     bool syncDocumentPosition(Document* doc, DocumentViewport* vp);
-
-    // MAC.8: Single source of truth for document-name -> NavigationBar +
-    // window-title sync. Empty name reverts to the SpeedyNote {version}
-    // brand on the OS title bar (used when the user closes the last tab via
-    // SplitViewManager::totalTabCountChanged); non-empty name pushes through
-    // to both NavigationBar (no-op on macOS where the bar is hidden but
-    // still receives state) and setWindowTitle (visible in the OS title bar
-    // on macOS, also drives Alt-Tab/dock labels on other platforms).
-    void syncDocumentTitle(const QString& name);
     
     /**
      * @brief Sync positions for all open documents AND mark them modified.
