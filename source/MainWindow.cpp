@@ -433,28 +433,31 @@ MainWindow::MainWindow(QWidget *parent)
         }
     });
 
-    // Smart tool auto-switch: clear override when split view closes
-    connect(m_splitViewManager, &SplitViewManager::splitStateChanged, this, [this](bool isSplit) {
-        if (!isSplit) clearToolOverride(false);
-        // Re-run the per-pane currentTabDisplayChanged hookup so the newly-
-        // created right TabManager drives updateWindowTitle() too.
-        // Qt::UniqueConnection prevents double-connecting the persistent
-        // left TabManager.
+    // Per-pane currentTabDisplayChanged -> updateWindowTitle wiring.
+    // Qt::UniqueConnection makes this idempotent so we can safely re-run
+    // it whenever a new TabManager appears (i.e. when split is toggled on).
+    auto wireTabTitleSignals = [this]() {
         m_splitViewManager->forEachTabManager([this](TabManager* tm, SplitViewManager::Pane){
             connect(tm, &TabManager::currentTabDisplayChanged,
                     this, &MainWindow::updateWindowTitle,
                     Qt::UniqueConnection);
         });
+    };
+
+    // Smart tool auto-switch: clear override when split view closes.
+    // Also wire the freshly-created right TabManager when split turns on
+    // (split-off doesn't need a re-hook: left is already wired and the
+    // post-merge title refresh comes from SplitViewManager's own
+    // activeViewportChanged emit at the end of destroyRightPane()).
+    connect(m_splitViewManager, &SplitViewManager::splitStateChanged, this,
+            [this, wireTabTitleSignals](bool isSplit) {
+        if (!isSplit) clearToolOverride(false);
+        else wireTabTitleSignals();
     });
 
     // Initial hookup for the left TabManager (created in SplitViewManager's
-    // constructor). The right pane gets wired lazily via splitStateChanged
-    // above the moment it's created.
-    m_splitViewManager->forEachTabManager([this](TabManager* tm, SplitViewManager::Pane){
-        connect(tm, &TabManager::currentTabDisplayChanged,
-                this, &MainWindow::updateWindowTitle,
-                Qt::UniqueConnection);
-    });
+    // ctor); right pane gets wired lazily via splitStateChanged above.
+    wireTabTitleSignals();
 
     // Auto-hide the tab bar container when only one notebook is open.
     // The filename click in NavigationBar still toggles visibility as a
