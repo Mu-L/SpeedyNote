@@ -202,6 +202,11 @@ void ShortcutManager::registerDefaults()
     registerAction("view.auto_layout", "Ctrl+Shift+2", tr("Toggle Auto Layout"), tr("View"));
     registerAction("view.left_sidebar", "Ctrl+Shift+L", tr("Toggle Left Sidebar"), tr("View"));
     registerAction("view.right_sidebar", "Ctrl+Shift+M", tr("Toggle Right Sidebar"), tr("View"));
+    // MAC.8: replaces the pre-MAC.8 NavigationBar filename-click gesture
+    // (the only NavigationBar control without a menu-bar equivalent before
+    // MAC.8). Cross-platform Ctrl+Shift+B (B = "tab Bar"); Qt swaps Ctrl<->Cmd
+    // on macOS so users get Cmd+Shift+B. No setMacosDefault override needed.
+    registerAction("view.toggle_tab_bar", "Ctrl+Shift+B", tr("Toggle Tab Bar"), tr("View"));
     registerAction("view.split_right", "Ctrl+\\", tr("Split Tab Right"), tr("View"));
     registerAction("view.merge_panes", "Ctrl+Shift+\\", tr("Merge All to Left"), tr("View"));
     registerAction("view.focus_left_pane", "Ctrl+3", tr("Focus Left Pane"), tr("View"));

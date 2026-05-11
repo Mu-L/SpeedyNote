@@ -312,6 +312,10 @@ void MacMenuBar::populateViewMenu()
     add(m_viewMenu, "navigation.launcher");
     add(m_viewMenu, "view.left_sidebar");
     add(m_viewMenu, "view.right_sidebar");
+    // MAC.8: replaces the pre-MAC.8 NavigationBar filename-click gesture
+    // (the only NavigationBar control without a menu-bar equivalent before
+    // MAC.8). Grouped here with the other show/hide UI panel toggles.
+    add(m_viewMenu, "view.toggle_tab_bar");
     add(m_viewMenu, "view.auto_layout");
     m_viewMenu->addSeparator();
 
