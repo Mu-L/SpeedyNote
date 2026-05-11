@@ -243,8 +243,11 @@ static bool isCjkOcrLanguage(const QString& lang)
 MainWindow::MainWindow(QWidget *parent) 
     : QMainWindow(parent), localServer(nullptr) {
 
-    setWindowTitle(tr("SpeedyNote %1").arg(APP_VERSION));
-    
+    // Initial fallback before widgets are wired; the canonical title comes
+    // from updateWindowTitle() at the end of the ctor and on every active-
+    // viewport / current-tab change thereafter.
+    setWindowTitle(QStringLiteral("SpeedyNote"));
+
     // Phase 3.1: Always using new DocumentViewport architecture
 
 #if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
@@ -409,14 +412,11 @@ MainWindow::MainWindow(QWidget *parent)
             vp->setTouchGestureMode(effectiveMode);
         }
         
-        // Phase C.1.6: Update NavigationBar with current document's filename
-        if (m_navigationBar) {
-            QString filename = tr("Untitled");
-            if (vp && vp->document()) {
-                filename = vp->document()->displayName();
-            }
-            m_navigationBar->setFilename(filename);
-        }
+        // Refresh OS window title + NavigationBar filename label from the
+        // newly-active tab. updateWindowTitle() reads the active pane's
+        // current viewport / document, so this covers both within-pane tab
+        // switches and active-pane focus changes in split view.
+        updateWindowTitle();
         
         // Restore left sidebar tab selection for new document tab
         // IMPORTANT: Must be AFTER updatePagePanelForViewport() which modifies sidebar tabs
@@ -436,6 +436,24 @@ MainWindow::MainWindow(QWidget *parent)
     // Smart tool auto-switch: clear override when split view closes
     connect(m_splitViewManager, &SplitViewManager::splitStateChanged, this, [this](bool isSplit) {
         if (!isSplit) clearToolOverride(false);
+        // Re-run the per-pane currentTabDisplayChanged hookup so the newly-
+        // created right TabManager drives updateWindowTitle() too.
+        // Qt::UniqueConnection prevents double-connecting the persistent
+        // left TabManager.
+        m_splitViewManager->forEachTabManager([this](TabManager* tm, SplitViewManager::Pane){
+            connect(tm, &TabManager::currentTabDisplayChanged,
+                    this, &MainWindow::updateWindowTitle,
+                    Qt::UniqueConnection);
+        });
+    });
+
+    // Initial hookup for the left TabManager (created in SplitViewManager's
+    // constructor). The right pane gets wired lazily via splitStateChanged
+    // above the moment it's created.
+    m_splitViewManager->forEachTabManager([this](TabManager* tm, SplitViewManager::Pane){
+        connect(tm, &TabManager::currentTabDisplayChanged,
+                this, &MainWindow::updateWindowTitle,
+                Qt::UniqueConnection);
     });
 
     // Auto-hide the tab bar container when only one notebook is open.
@@ -628,9 +646,10 @@ MainWindow::MainWindow(QWidget *parent)
                 
                 tm->setTabTitle(index, doc->displayName());
                 tm->markTabModified(index, false);
-                if (m_navigationBar) {
-                    m_navigationBar->setFilename(doc->displayName());
-                }
+                // NavigationBar / window title updates are driven by the
+                // setTabTitle/markTabModified signals above (when index is
+                // the current tab) and by activeViewportChanged after the
+                // closeTab() below switches to a sibling tab.
             }
         }
         
@@ -700,6 +719,9 @@ MainWindow::MainWindow(QWidget *parent)
         }
     });
 
+    // Seed the window title + nav-bar filename from whatever state the
+    // ctor ended in (typically: no tabs yet -> "SpeedyNote" / "Untitled").
+    updateWindowTitle();
 }
 
 
@@ -1162,7 +1184,7 @@ void MainWindow::setupUi() {
     // Phase A: NavigationBar (Toolbar Extraction)
     // =========================================================================
     m_navigationBar = new NavigationBar(this);
-    m_navigationBar->setFilename(tr("Untitled"));
+    // Filename label is seeded by updateWindowTitle() at end of ctor.
     mainLayout->addWidget(m_navigationBar);
     
     // Connect NavigationBar signals
@@ -3720,14 +3742,12 @@ void MainWindow::saveDocument()
         return;  // User cancelled or save failed
     }
     
-    // Update tab title and NavigationBar
+    // Update tab title; NavigationBar + window title follow via the
+    // currentTabDisplayChanged signal emitted by setTabTitle/markTabModified.
     int currentIndex = tabManager()->currentIndex();
     if (currentIndex >= 0) {
         tabManager()->setTabTitle(currentIndex, doc->name);
         tabManager()->markTabModified(currentIndex, false);
-    }
-    if (m_navigationBar) {
-        m_navigationBar->setFilename(doc->name);
     }
 }
 
@@ -3737,9 +3757,9 @@ void MainWindow::saveDocument()
 // pipeline.
 //
 // Mirrors saveDocument()'s post-save flow (sync position before save; refresh
-// tab title + NavigationBar filename + clear modified marker after success)
-// so that after Save As the UI reflects the new file name immediately,
-// matching the existing-path branch of saveDocument().
+// tab title + clear modified marker after success). NavigationBar filename
+// and OS window title follow automatically via the currentTabDisplayChanged
+// signal emitted by setTabTitle / markTabModified.
 void MainWindow::saveDocumentAs()
 {
     if (!m_documentManager || !tabManager()) {
@@ -3759,14 +3779,12 @@ void MainWindow::saveDocumentAs()
     }
 
     // Post-save UI refresh — saveNewDocumentWithDialog has updated doc->name
-    // to the chosen file's basename, so propagate it to the tab and nav bar.
+    // to the chosen file's basename. Propagating it to the tab fires
+    // currentTabDisplayChanged, which drives the nav-bar + window title.
     int currentIndex = tabManager()->currentIndex();
     if (currentIndex >= 0) {
         tabManager()->setTabTitle(currentIndex, doc->name);
         tabManager()->markTabModified(currentIndex, false);
-    }
-    if (m_navigationBar) {
-        m_navigationBar->setFilename(doc->name);
     }
 }
 
@@ -6561,6 +6579,52 @@ void MainWindow::syncOcrCheckActions()
         a->setChecked(ocrST->isShowTextEnabled());
     if (auto* a = sm->action(QStringLiteral("ocr.snap_grid")))
         a->setChecked(ocrST->isSnapToGridEnabled());
+}
+
+// Refresh both the OS window title (per-platform format with Qt's native
+// [*] modified marker) and the NavigationBar filename label from the active
+// pane's current tab. See the header comment for format details.
+void MainWindow::updateWindowTitle()
+{
+    QString displayName;
+    bool modified = false;
+    QString filePath;
+
+    if (auto* tm = tabManager()) {
+        const int idx = tm->currentIndex();
+        if (idx >= 0) {
+            if (auto* vp = currentViewport()) {
+                if (auto* doc = vp->document()) {
+                    displayName = doc->displayName();
+                    filePath = doc->bundlePath();
+                }
+            }
+            modified = tm->isTabModified(idx);
+        }
+    }
+
+    if (displayName.isEmpty()) {
+        setWindowTitle(QStringLiteral("SpeedyNote"));
+        setWindowModified(false);
+    } else {
+#ifdef Q_OS_MACOS
+        // Apple HIG: title is just the document name; setWindowModified
+        // drives the bullet edit-marker on the close button.
+        setWindowTitle(tr("%1[*]").arg(displayName));
+#else
+        setWindowTitle(tr("%1[*] \xE2\x80\x94 SpeedyNote").arg(displayName));
+#endif
+        setWindowModified(modified);
+    }
+
+#ifdef Q_OS_MACOS
+    // Empty path is a valid no-op (clears any existing proxy icon).
+    setWindowFilePath(filePath);
+#endif
+
+    if (m_navigationBar) {
+        m_navigationBar->setFilename(displayName.isEmpty() ? tr("Untitled") : displayName);
+    }
 }
 
 // MAC.6: Lock every unlocked OCR-text object on the active page (paged docs)

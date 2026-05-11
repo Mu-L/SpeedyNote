@@ -204,12 +204,30 @@ public:
      */
     QString tabTitle(int index) const;
 
+    /**
+     * @brief Query the modified flag for a tab.
+     * @param index The tab index.
+     * @return True if the tab is marked modified, false otherwise (or for invalid index).
+     */
+    bool isTabModified(int index) const;
+
 signals:
     /**
      * @brief Emitted when the current tab changes.
      * @param viewport The new current viewport (may be nullptr if no tabs).
      */
     void currentViewportChanged(DocumentViewport* viewport);
+
+    /**
+     * @brief Emitted when the *currently active* tab's display text changes.
+     *
+     * Fires from setTabTitle() / markTabModified() only when the affected
+     * index is the currently selected tab and the visible text actually
+     * changed. Edits to background tabs do not emit. Used by MainWindow to
+     * keep the OS window title and NavigationBar filename in sync with the
+     * active document.
+     */
+    void currentTabDisplayChanged();
 
     /**
      * @brief Emitted just before a tab is closed (notification only).
