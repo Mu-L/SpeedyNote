@@ -25,7 +25,7 @@
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #endif
-#include <QShortcut>  // For m_managedShortcuts hash
+#include <QShortcut>  // For m_escapeShortcut + the macOS Cmd+K Settings alternate
 #include <memory>     // For std::unique_ptr
 // Note: ControlPanelDialog is included in MainWindow.cpp (Phase CP.1)
 #include <QLocalServer>
@@ -222,6 +222,20 @@ public:
     // InkCanvas* currentCanvas();  // MW1.4: Stub - returns nullptr, use currentViewport()
     DocumentViewport* currentViewport() const; // Phase 3.1.4: New accessor for DocumentViewport
     int tabCount() const;  // Returns number of open tabs (used by Launcher for Escape handling)
+
+    /**
+     * @brief Get the currently-active MainWindow instance (MAC.1).
+     *
+     * Tracks the most recently focused MainWindow. Used by ShortcutManager
+     * QAction handlers (and the upcoming MacMenuBar in MAC.2+) to dispatch
+     * actions to the correct window when multiple are open. Survives modal
+     * dialogs (the dialog gets focus, but s_activeMainWindow continues to
+     * point at the underlying MainWindow).
+     *
+     * Returns nullptr if no MainWindow has ever received focus or all have
+     * been destroyed.
+     */
+    static MainWindow* activeMainWindow();
     void switchToTabIndex(int index);  // Switch to a specific tab by index
     void saveSessionTabs();  // Persist open tab paths to QSettings for session restore
 
@@ -291,6 +305,10 @@ public:
 #if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
     static QSharedMemory *sharedMemory;
 #endif
+
+    /// MAC.1: most recently focused MainWindow. QPointer auto-clears on
+    /// destruction so activeMainWindow() returns nullptr safely.
+    static QPointer<MainWindow> s_activeMainWindow;
     
     // Static cleanup method for signal handlers
     static void cleanupSharedResources();
@@ -302,6 +320,8 @@ protected:
     void showEvent(QShowEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;  // New: Handle keyboard shortcuts
     void keyReleaseEvent(QKeyEvent *event) override; // Track Ctrl key release for trackpad pinch-zoom detection
+    void focusInEvent(QFocusEvent *event) override;  // MAC.1: track active MainWindow
+    void changeEvent(QEvent *event) override;        // Sync nav bar fullscreen button when window state changes (e.g. macOS green button)
     // REMOVED: tabletEvent removed - tablet event handling deleted
 
 #ifdef Q_OS_WIN
@@ -359,13 +379,39 @@ private slots:
     
     // Phase doc-1: Document operations
     void saveDocument();          // doc-1.1: Save document to JSON file (Ctrl+S)
+    void saveDocumentAs();        // MAC.3: Always prompt for new path (Ctrl+Shift+S)
     void loadDocument();          // doc-1.2: Load document from JSON file (Ctrl+O)
     void addPageToDocument();     // doc-1.0: Add page at end of document (Ctrl+Shift+A)
     void insertPageInDocument();  // Phase 3: Insert page after current (Ctrl+Shift+I)
     void deletePageInDocument();  // Phase 3B: Delete current page (Ctrl+Shift+D)
     void openPdfDocument(const QString &filePath = QString());       // doc-1.4: Open PDF file (Ctrl+Shift+O)
     bool isDarkMode();
- 
+
+    // MAC.6: promoted from private: to private slots: so MacMenuBar can
+    // dispatch to them via QMetaObject::invokeMethod (matches the MAC.3
+    // showPdfRelinkDialog pattern). lockAllOcrText() is a new slot factored
+    // out of the inline lambda previously living in setupUi()'s overflow
+    // menu; the overflow now calls it directly so the macOS OCR menu and
+    // the overflow menu share one implementation.
+    void showOcrLanguageDialog();
+    void lockAllOcrText();
+
+    // MAC.7: Sync the 7 object Z-order + affinity QActions' enabled state to
+    // the active viewport's currentTool() == ObjectSelect && hasSelectedObjects().
+    // Called from connectViewportScrollSignals (extends the existing
+    // m_toolChangedConn / m_selectionChangedConn lambdas), from changeEvent's
+    // ActivationChange branch, and once after binding in setupManagedShortcuts.
+    void updateObjectActionsEnabled();
+
+    // MAC.6 review fix: Push this window's OcrSubToolbar button states onto
+    // the 3 checkable OCR QActions. Called from connectViewportScrollSignals
+    // after a tab switch (toolbar's restoreTabState uses blockSignals so the
+    // user-driven sync edge in setupConnections doesn't fire) and from
+    // changeEvent's ActivationChange branch (multi-window: the QActions are
+    // app-global, so switching focus between two MainWindows whose toolbars
+    // disagree must re-seed the menu checkmarks from the now-active window).
+    void syncOcrCheckActions();
+
 private:
 
     /**
@@ -731,7 +777,7 @@ private:
     void syncOcrTextObjects(Page* page, const QVector<OcrTextBlock>& blocks);
     void setOcrTextVisibility(bool visible);
     void setOcrConfidenceVisibility(bool enabled);
-    void showOcrLanguageDialog();
+    // MAC.6: showOcrLanguageDialog() promoted to private slots: above.
     QString resolveOcrLanguage(Document* doc) const;
     OcrSnapParams buildOcrSnapParams(Document* doc, Page* page) const;
     
@@ -746,9 +792,25 @@ private:
     
     // Layout timers and separators - REMOVED MW4.3: No longer needed
     
-    // Keyboard Shortcut Hub: Managed shortcuts
-    QHash<QString, QShortcut*> m_managedShortcuts;
-    void setupManagedShortcuts();  // Initialize shortcuts from ShortcutManager
+    // Keyboard Shortcut Hub
+    //
+    // Almost every keyboard shortcut now lives on a registry QAction (owned
+    // by ShortcutManager, dispatched via wireQActionDispatchers). m_escapeShortcut
+    // is the lone exception — it's a per-window QShortcut because Escape
+    // dismissal walks a per-window priority list (modal -> search bar ->
+    // floating editor -> viewport -> launcher) that doesn't fit the
+    // activeMainWindow() dispatch model and needs Qt::WindowShortcut scope.
+    // setupManagedShortcuts() also installs an unnamed Cmd+K alternate for
+    // Settings on macOS (parent-owned by `this`, no separate handle needed).
+    QShortcut* m_escapeShortcut = nullptr;
+    void setupManagedShortcuts();  // Wires every registry QAction to this window plus the two non-registry cases above.
+
+    // MAC.3: One-time, app-wide wiring of QAction triggered() signals to their
+    // handlers via MainWindow::activeMainWindow() dispatch. Static so it runs
+    // exactly once per process regardless of how many MainWindows are created;
+    // each MainWindow still calls addAction() per migrated id so the QAction's
+    // shortcut is registered in that window's shortcut map.
+    static void wireQActionDispatchers();
 
 #ifdef Q_OS_LINUX
     // Palm rejection state (Linux only)

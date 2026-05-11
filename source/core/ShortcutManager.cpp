@@ -83,7 +83,20 @@ ShortcutManager::ShortcutManager(QObject* parent)
     }
     
     m_configPath = configDir + "/shortcuts.json";
-    
+
+    // MAC.1: keep registry QAction shortcuts in sync with user remaps.
+    // shortcutChanged is emitted whenever the effective shortcut changes
+    // (set/clear user override). If a QAction has been instantiated for the
+    // affected ID, refresh its shortcut so menu items / addAction consumers
+    // reflect the new binding immediately.
+    connect(this, &ShortcutManager::shortcutChanged,
+            this, [this](const QString& actionId, const QString& newShortcut) {
+        auto it = m_shortcuts.find(actionId);
+        if (it != m_shortcuts.end() && it.value().action) {
+            it.value().action->setShortcut(QKeySequence(newShortcut));
+        }
+    });
+
 #ifdef SPEEDYNOTE_DEBUG
     qDebug() << "[ShortcutManager] Config path:" << m_configPath;
 #endif
@@ -97,6 +110,7 @@ void ShortcutManager::registerDefaults()
 {
     // ===== File Operations =====
     registerAction("file.save", "Ctrl+S", tr("Save Document"), tr("File"));
+    registerAction("file.save_as", "Ctrl+Shift+S", tr("Save As..."), tr("File"));  // MAC.3
     registerAction("file.new_paged", "Ctrl+N", tr("New Paged Notebook"), tr("File"));
     registerAction("file.new_edgeless", "Ctrl+Shift+N", tr("New Edgeless Canvas"), tr("File"));
     registerAction("file.open_pdf", "Ctrl+O", tr("Open PDF"), tr("File"));
@@ -220,7 +234,15 @@ void ShortcutManager::registerDefaults()
     // ===== Edgeless Navigation (only for edgeless documents) =====
     registerAction("edgeless.home", "Home", tr("Return to Origin"), tr("Edgeless"), Scope::EdgelessOnly);
     registerAction("edgeless.go_back", "Backspace", tr("Go Back"), tr("Edgeless"), Scope::EdgelessOnly);
-    
+
+    // ===== Platform-specific defaults (MAC.1) =====
+    // Per QA Q3.2 / Q4.3.d / Q4.5: macOS users get Apple-conventional bindings
+    // for these three actions. Other platforms keep the cross-platform default.
+    // The macOS user-visible impact is documented in MACOS_MENUBAR_PLAN.md MAC.1.
+    setMacosDefault("app.settings",            "Ctrl+,");      // Cmd+, (Apple Settings convention)
+    setMacosDefault("view.fullscreen",         "Ctrl+Meta+F"); // Ctrl+Cmd+F (Qt swaps Ctrl<->Meta on macOS)
+    setMacosDefault("layer.toggle_visibility", "Ctrl+;");      // Cmd+; (avoids collision with Cmd+, Settings)
+
 #ifdef SPEEDYNOTE_DEBUG
     qDebug() << "[ShortcutManager] Registered" << m_shortcuts.size() << "default shortcuts";
 #endif
@@ -277,6 +299,13 @@ bool ShortcutManager::scopesCanConflict(Scope a, Scope b)
     return a == b;
 }
 
+bool ShortcutManager::isEnabledForActiveScope(Scope entryScope, Scope activeScope)
+{
+    return entryScope == Scope::Global
+        || activeScope == Scope::Global
+        || entryScope == activeScope;
+}
+
 bool ShortcutManager::hasAction(const QString& actionId) const
 {
     return m_shortcuts.contains(actionId);
@@ -292,13 +321,18 @@ QString ShortcutManager::shortcutForAction(const QString& actionId) const
     if (it == m_shortcuts.constEnd()) {
         return QString();
     }
-    
+
     const ShortcutEntry& entry = it.value();
-    
-    // Return user override if set, otherwise default
+
+    // Precedence: user override > macOS default (on macOS only) > cross-platform default
     if (!entry.userShortcut.isEmpty()) {
         return entry.userShortcut;
     }
+#ifdef Q_OS_MACOS
+    if (!entry.macosDefault.isEmpty()) {
+        return entry.macosDefault;
+    }
+#endif
     return entry.defaultShortcut;
 }
 
@@ -317,6 +351,15 @@ QString ShortcutManager::defaultShortcutForAction(const QString& actionId) const
     if (it == m_shortcuts.constEnd()) {
         return QString();
     }
+    // MAC.1: On macOS, the "default" the user would revert to is the
+    // platform-specific default if set. This keeps the ControlPanelDialog
+    // "Default" column and the "Reset to Default" preview in sync with what
+    // shortcutForAction() actually resolves to after clearing the override.
+#ifdef Q_OS_MACOS
+    if (!it.value().macosDefault.isEmpty()) {
+        return it.value().macosDefault;
+    }
+#endif
     return it.value().defaultShortcut;
 }
 
@@ -344,13 +387,15 @@ void ShortcutManager::setUserShortcut(const QString& actionId, const QString& sh
     
     // Normalize the shortcut to handle shifted symbols (e.g., "Ctrl+Shift+@" → "Ctrl+Shift+2")
     QString normalizedShortcut = normalizeShortcut(shortcut);
-    
+
     ShortcutEntry& entry = it.value();
     QString oldShortcut = shortcutForAction(actionId);
-    
-    // If the new shortcut matches the default, clear the override instead
-    // This avoids storing redundant overrides
-    if (normalizedShortcut == entry.defaultShortcut) {
+
+    // If the new shortcut matches the platform-effective default, clear the
+    // override instead. This avoids storing redundant overrides and keeps
+    // the ControlPanelDialog "overridden" badge accurate on macOS where the
+    // effective default may be macosDefault rather than defaultShortcut.
+    if (normalizedShortcut == defaultShortcutForAction(actionId)) {
         entry.userShortcut.clear();
     } else {
         entry.userShortcut = normalizedShortcut;
@@ -372,17 +417,19 @@ void ShortcutManager::clearUserShortcut(const QString& actionId)
     if (it == m_shortcuts.end()) {
         return;
     }
-    
+
     ShortcutEntry& entry = it.value();
-    
+
     if (entry.userShortcut.isEmpty()) {
         return;  // No override to clear
     }
-    
+
     QString oldShortcut = entry.userShortcut;
-    entry.userShortcut = QString();
-    
-    QString newShortcut = entry.defaultShortcut;
+    entry.userShortcut.clear();
+
+    // Use shortcutForAction so the signal carries the actual new effective
+    // binding (which on macOS may be macosDefault, not defaultShortcut).
+    QString newShortcut = shortcutForAction(actionId);
     if (oldShortcut != newShortcut) {
 #ifdef SPEEDYNOTE_DEBUG
         qDebug() << "[ShortcutManager] Reverted to default:" << actionId
@@ -395,21 +442,26 @@ void ShortcutManager::clearUserShortcut(const QString& actionId)
 void ShortcutManager::resetAllToDefaults()
 {
     QStringList changedActions;
-    
+
     // Collect all actions that have overrides
     for (auto it = m_shortcuts.begin(); it != m_shortcuts.end(); ++it) {
         if (!it.value().userShortcut.isEmpty()) {
             changedActions.append(it.key());
         }
     }
-    
-    // Clear overrides and emit signals
+
+    // Clear overrides first, then emit. We must clear all overrides before
+    // emitting so that any listener that re-queries shortcutForAction (e.g.
+    // for conflict detection) sees the post-reset state for every action.
     for (const QString& actionId : changedActions) {
-        ShortcutEntry& entry = m_shortcuts[actionId];
-        entry.userShortcut = QString();
-        emit shortcutChanged(actionId, entry.defaultShortcut);
+        m_shortcuts[actionId].userShortcut.clear();
     }
-    
+    for (const QString& actionId : changedActions) {
+        // Emit the resolved shortcut so listeners get the correct platform
+        // default (macosDefault on macOS, defaultShortcut elsewhere).
+        emit shortcutChanged(actionId, shortcutForAction(actionId));
+    }
+
 #ifdef SPEEDYNOTE_DEBUG
     qDebug() << "[ShortcutManager] Reset" << changedActions.size() << "shortcuts to defaults";
 #endif
@@ -650,5 +702,82 @@ QString ShortcutManager::categoryForAction(const QString& actionId) const
         return QString();
     }
     return it.value().category;
+}
+
+// ============================================================================
+// QAction Registry (MAC.1)
+// ============================================================================
+
+QAction* ShortcutManager::action(const QString& actionId)
+{
+    auto it = m_shortcuts.find(actionId);
+    if (it == m_shortcuts.end()) {
+        qWarning() << "[ShortcutManager] action(): unknown action id:" << actionId;
+        return nullptr;
+    }
+
+    ShortcutEntry& entry = it.value();
+    if (!entry.action) {
+        entry.action = new QAction(entry.displayName, this);
+        entry.action->setShortcut(QKeySequence(shortcutForAction(actionId)));
+        entry.action->setShortcutContext(entry.context);
+        entry.action->setObjectName(actionId);  // for debugging / accessibility
+        // Apply current scope state in case the scope was set before this
+        // action was first queried.
+        entry.action->setEnabled(isEnabledForActiveScope(entry.scope, m_activeScope));
+    }
+    return entry.action;
+}
+
+void ShortcutManager::setMacosDefault(const QString& actionId, const QString& shortcut)
+{
+    auto it = m_shortcuts.find(actionId);
+    if (it == m_shortcuts.end()) {
+        qWarning() << "[ShortcutManager] setMacosDefault: unknown action:" << actionId;
+        return;
+    }
+    it.value().macosDefault = shortcut;
+    // If a QAction already exists, refresh its shortcut: on macOS the new
+    // macosDefault may now be the effective binding.
+    if (it.value().action) {
+        it.value().action->setShortcut(QKeySequence(shortcutForAction(actionId)));
+    }
+}
+
+void ShortcutManager::setActionContext(const QString& actionId, Qt::ShortcutContext ctx)
+{
+    auto it = m_shortcuts.find(actionId);
+    if (it == m_shortcuts.end()) {
+        qWarning() << "[ShortcutManager] setActionContext: unknown action:" << actionId;
+        return;
+    }
+    it.value().context = ctx;
+    if (it.value().action) {
+        it.value().action->setShortcutContext(ctx);
+    }
+}
+
+void ShortcutManager::setActiveDocumentScope(Scope scope)
+{
+    if (m_activeScope == scope) {
+        return;
+    }
+    m_activeScope = scope;
+
+    // Re-evaluate enabled state for every instantiated QAction. Un-instantiated
+    // actions will pick up the current scope when first created via action().
+    for (auto it = m_shortcuts.begin(); it != m_shortcuts.end(); ++it) {
+        if (!it.value().action) {
+            continue;
+        }
+        it.value().action->setEnabled(isEnabledForActiveScope(it.value().scope, scope));
+    }
+
+#ifdef SPEEDYNOTE_DEBUG
+    const char* scopeName = (scope == Scope::Global) ? "Global"
+                          : (scope == Scope::PagedOnly) ? "PagedOnly"
+                          : "EdgelessOnly";
+    qDebug() << "[ShortcutManager] Active document scope:" << scopeName;
+#endif
 }
 

@@ -6,6 +6,7 @@
 #include <QHash>
 #include <QKeySequence>
 #include <QStringList>
+#include <QAction>
 
 /**
  * @brief Centralized keyboard shortcut management system.
@@ -186,6 +187,68 @@ public:
      */
     QString categoryForAction(const QString& actionId) const;
 
+    // ========== QAction Registry (MAC.1) ==========
+
+    /**
+     * @brief Get (or lazily create) a QAction for the given action ID.
+     *
+     * The QAction is parented to ShortcutManager and lives for the application
+     * lifetime. Its shortcut, context, display name, and enabled state are
+     * managed by ShortcutManager. The QAction is not added to any widget by
+     * default — its shortcut will not fire until a consumer (menu bar,
+     * MainWindow, toolbar) calls widget->addAction(action) or adds it to a
+     * QMenu in a visible menu bar.
+     *
+     * Returns nullptr if actionId is not registered.
+     *
+     * Per QA Q6.5.1: callers connect to QAction::triggered using the standard
+     * Qt connect() idiom; ShortcutManager does not provide handler-registration
+     * sugar.
+     */
+    QAction* action(const QString& actionId);
+
+    /**
+     * @brief Set a macOS-only default shortcut for an action.
+     *
+     * On macOS, the macOS default takes precedence over the cross-platform
+     * default (but is still overridden by a user override). On other
+     * platforms, this value is stored but has no effect.
+     *
+     * Per QA Q3.2 / Q4.3.d / Q4.5: used for app.settings (Ctrl+,),
+     * view.fullscreen (Ctrl+Meta+F = Cmd+Ctrl+F), and
+     * layer.toggle_visibility (Ctrl+;).
+     */
+    void setMacosDefault(const QString& actionId, const QString& shortcut);
+
+    /**
+     * @brief Override the QAction shortcut context for a specific action.
+     *
+     * Default context for new QActions is Qt::WindowShortcut (per QA Q6.5.2).
+     * Letter-key tool shortcuts (B/E/L/T/M/V/I) may need
+     * Qt::WidgetWithChildrenShortcut to avoid firing while typing in text
+     * widgets — to be applied during MAC.7. Unused in MAC.1 itself.
+     */
+    void setActionContext(const QString& actionId, Qt::ShortcutContext ctx);
+
+    /**
+     * @brief Set the currently-active document scope.
+     *
+     * Enables/disables every registered QAction based on its declared scope:
+     *   - Scope::Global actions are always enabled
+     *   - Scope::PagedOnly actions are enabled iff scope == PagedOnly
+     *   - Scope::EdgelessOnly actions are enabled iff scope == EdgelessOnly
+     *   - When scope == Global, all actions are enabled (e.g., no document open)
+     *
+     * Per QA Q6.5.5: ShortcutManager owns scope enforcement. MainWindow plumbs
+     * SplitViewManager::activeViewportChanged into this setter.
+     */
+    void setActiveDocumentScope(Scope scope);
+
+    /**
+     * @brief Get the currently-active document scope.
+     */
+    Scope activeDocumentScope() const { return m_activeScope; }
+
 signals:
     /**
      * @brief Emitted when a shortcut changes (user override or clear).
@@ -209,10 +272,13 @@ private:
      */
     struct ShortcutEntry {
         QString defaultShortcut;   ///< The built-in default
+        QString macosDefault;      ///< MAC.1: optional macOS-only default (takes precedence over defaultShortcut on macOS)
         QString userShortcut;      ///< User override (empty = use default)
         QString displayName;       ///< Human-readable name for UI
         QString category;          ///< Category for grouping
         Scope scope = Scope::Global;  ///< Document mode scope for conflict detection
+        Qt::ShortcutContext context = Qt::WindowShortcut;  ///< MAC.1: shortcut context for the QAction (Q6.5.2)
+        QAction* action = nullptr; ///< MAC.1: lazily-created QAction parented to ShortcutManager
     };
     
     /**
@@ -222,10 +288,24 @@ private:
      * conflict with each other because they're mutually exclusive.
      */
     static bool scopesCanConflict(Scope a, Scope b);
+
+    /**
+     * @brief MAC.1: Whether an entry should be enabled for the given active scope.
+     *
+     * Returns true if:
+     *   - the entry is Global (always available), or
+     *   - the active scope is Global (e.g. no document open — enable everything), or
+     *   - the entry's scope matches the active scope (PagedOnly+PagedOnly or
+     *     EdgelessOnly+EdgelessOnly).
+     */
+    static bool isEnabledForActiveScope(Scope entryScope, Scope activeScope);
     
     /// All registered shortcuts, keyed by action ID
     QHash<QString, ShortcutEntry> m_shortcuts;
-    
+
+    /// MAC.1: currently-active document scope (drives QAction enable/disable)
+    Scope m_activeScope = Scope::Global;
+
     /// Path to shortcuts.json
     QString m_configPath;
     

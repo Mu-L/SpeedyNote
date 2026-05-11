@@ -216,6 +216,11 @@ void OcrSubToolbar::clearStatusAfterDelay(int ms)
     m_statusClearTimer->start(ms);
 }
 
+bool OcrSubToolbar::isAutoOcrEnabled() const
+{
+    return m_autoOcrButton && m_autoOcrButton->isChecked();
+}
+
 bool OcrSubToolbar::isShowTextEnabled() const
 {
     return m_showTextButton && m_showTextButton->isChecked();

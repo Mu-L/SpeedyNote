@@ -24,6 +24,7 @@ public:
     void setOcrAvailable(bool available);
     void setStatusText(const QString& text);
     void clearStatusAfterDelay(int ms = 5000);
+    bool isAutoOcrEnabled() const;
     bool isShowTextEnabled() const;
     bool isConfidenceEnabled() const;
     bool isSnapToGridEnabled() const;
