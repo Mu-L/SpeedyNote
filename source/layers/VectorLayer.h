@@ -680,19 +680,17 @@ public:
             return;
         }
 
-        // Clear-and-repaint the affected region in cache-local coords.
-        // The cache painter is set up with translate(-focusRect.topLeft())
-        // and scale(zoom, zoom), so we operate in page/tile-local logical
-        // coordinates and let the transform handle the mapping to pixels.
+        // Clear-and-repaint the affected region. The pixmap has its DPR set
+        // to (zoom * dpr) by rebuildFocusCache, so the focus painter operates
+        // in page/tile-local logical coordinates after a single
+        // translate(-m_focusRect.topLeft()).
         const QRectF clearRect = m_focusRect.intersected(removedBounds);
         QPainter p(&m_focusCache);
-        p.translate(-m_focusRect.topLeft() * (m_focusZoom * m_focusDpr));
-        p.scale(m_focusZoom * m_focusDpr, m_focusZoom * m_focusDpr);
+        beginFocusPainter(p);  // antialias + page-local coords
         p.setCompositionMode(QPainter::CompositionMode_Clear);
         p.fillRect(clearRect, Qt::transparent);
         p.setCompositionMode(QPainter::CompositionMode_SourceOver);
         p.setClipRect(clearRect);
-        p.setRenderHint(QPainter::Antialiasing, true);
         for (const auto& s : m_strokes) {
             if (s.boundingBox.intersects(clearRect)) renderStroke(p, s);
         }
@@ -842,6 +840,13 @@ public:
                       RenderTier tier,
                       const QRectF& focusRect = QRectF()) {
         if (!visible || m_strokes.isEmpty()) return;
+        // Symmetric to DocumentViewport releasing the capped cache before
+        // calling us with tier != Capped: when the dispatcher picks Capped,
+        // any leftover focus pixmap (from when this tile was on-screen at
+        // high zoom) is dead weight, so free it eagerly.
+        if (tier == RenderTier::Capped && hasFocusCacheAllocated()) {
+            releaseFocusCache();
+        }
         switch (tier) {
         case RenderTier::Capped:
             // Delegate to the existing path; preserves the Qt5 rect-mapping
@@ -851,17 +856,19 @@ public:
         case RenderTier::Focus: {
             ensureFocusCacheValid(size, zoom, dpr, focusRect);
             if (m_focusCache.isNull()) break;
-            // Source pixmap is in physical pixels covering `m_focusRect`;
-            // destination is in painter logical coords, which the caller has
-            // already pre-scaled by `zoom`. The destination rect is therefore
-            // exactly `m_focusRect` in page/tile-local logical coords.
-            painter.drawPixmap(m_focusRect, m_focusCache,
-                               QRectF(QPointF(0, 0), QSizeF(m_focusCache.size())));
+            // The pixmap has DPR set to (zoom * dpr), so its logical size
+            // matches m_focusRect.size() in page/tile-local units. The
+            // point-draw overload routes through the same fast 1:1 blit
+            // path used by the capped cache - no smooth-scale resampling.
+            painter.drawPixmap(m_focusRect.topLeft(), m_focusCache);
             break;
         }
         case RenderTier::Direct:
             painter.save();
-            painter.setClipRect(focusRect);
+            // IntersectClip rather than replace: the outer painter may
+            // already have a clip (e.g. paintEvent dirty-region), and we
+            // only want to further constrain to the focus rect.
+            painter.setClipRect(focusRect, Qt::IntersectClip);
             renderDirectClipped(painter, focusRect);
             painter.restore();
             break;
@@ -886,11 +893,14 @@ public:
         Q_UNUSED(dpr);
         if (!visible || m_strokes.isEmpty()) return;
         if (tier == RenderTier::Capped) {
+            // Same symmetry as `renderTiered`: free the focus pixmap when
+            // we're back on the capped path.
+            if (hasFocusCacheAllocated()) releaseFocusCache();
             renderExcluding(painter, excludeIds);
             return;
         }
         painter.save();
-        painter.setClipRect(focusRect);
+        painter.setClipRect(focusRect, Qt::IntersectClip);
         renderDirectExcludingClipped(painter, excludeIds, focusRect);
         painter.restore();
     }
@@ -1125,22 +1135,34 @@ private:
      * fractional-pixel aliasing.
      */
     /**
+     * @brief Set up the focus-cache painter in page/tile-local logical coords.
+     *
+     * Pre-condition: `m_focusCache` is allocated with
+     * `setDevicePixelRatio(m_focusZoom * m_focusDpr)`, so the painter starts
+     * in logical-pixel space (1 unit = 1 page/tile point inside `m_focusRect`).
+     * After this call, drawing a stroke at its page/tile-local position
+     * lands in the right pixel. Caller is responsible for any clip.
+     */
+    void beginFocusPainter(QPainter& p) const {
+        p.setRenderHint(QPainter::Antialiasing, true);
+        p.translate(-m_focusRect.topLeft());
+    }
+
+    /**
      * @brief Rebuild the focus cache from scratch.
      *
-     * Painter is set up so logical-coordinate strokes (in page/tile space)
-     * map directly into the pixmap, with `focusRect.topLeft()` as the cache
-     * origin. Each cache pixel maps to one physical screen pixel at the
-     * current zoom (no divisor).
+     * The pixmap is allocated at physical pixel size and tagged with
+     * `setDevicePixelRatio(zoom * dpr)`, so its logical size matches
+     * `focusRect.size()`. This lets `drawPixmap(focusRect.topLeft(), pixmap)`
+     * blit at exactly 1 cache pixel = 1 screen pixel through Qt's fast path
+     * (no QRectF rect-to-rect resample), matching the capped cache pattern.
      */
     void rebuildFocusCache(qreal zoom, qreal dpr,
                            const QRectF& focusRect,
                            const QSize& physicalSize) const {
         m_focusCache = QPixmap(physicalSize);
+        m_focusCache.setDevicePixelRatio(zoom * dpr);
         m_focusCache.fill(Qt::transparent);
-        // Note: we deliberately do NOT call setDevicePixelRatio() on the
-        // focus pixmap. The caller draws it at logical coords with
-        // drawPixmap(focusRect.topLeft(), m_focusCache, srcRect-in-physical),
-        // and managing DPR manually keeps the math simple.
 
         m_focusZoom = zoom;
         m_focusDpr  = dpr;
@@ -1150,11 +1172,7 @@ private:
         if (m_strokes.isEmpty()) return;
 
         QPainter p(&m_focusCache);
-        p.setRenderHint(QPainter::Antialiasing, true);
-        // Map page/tile-local logical coords -> cache pixels.
-        const qreal s = zoom * dpr;
-        p.scale(s, s);
-        p.translate(-focusRect.topLeft());
+        beginFocusPainter(p);
         // Cull to the visible rect so per-stroke renderStroke can early-exit.
         p.setClipRect(focusRect);
         for (const auto& stroke : m_strokes) {
@@ -1170,10 +1188,7 @@ private:
     void appendPendingFocusStrokes() const {
         if (m_focusPendingStrokeStart < 0 || m_focusCache.isNull()) return;
         QPainter p(&m_focusCache);
-        p.setRenderHint(QPainter::Antialiasing, true);
-        const qreal s = m_focusZoom * m_focusDpr;
-        p.scale(s, s);
-        p.translate(-m_focusRect.topLeft());
+        beginFocusPainter(p);
         p.setClipRect(m_focusRect);
         for (int i = m_focusPendingStrokeStart; i < m_strokes.size(); ++i) {
             if (m_strokes[i].boundingBox.intersects(m_focusRect)) {

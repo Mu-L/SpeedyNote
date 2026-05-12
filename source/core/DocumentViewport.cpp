@@ -4153,13 +4153,28 @@ void DocumentViewport::preloadStrokeCaches()
     
     // Get device pixel ratio for cache
     qreal dpr = devicePixelRatioF();
-    
+    const qreal effScale = m_zoomLevel * dpr;
+
     // Phase O1.7.5: Preload nearby pages (triggers lazy loading if needed)
     // page() will automatically load from disk if not already in memory
     for (int i = preloadStart; i <= preloadEnd; ++i) {
         Page* page = m_document->page(i);  // This triggers lazy load
         if (!page) continue;
-        
+
+        // Skip building the capped cache when this page would switch to
+        // Focus tier on the next paint. The capped pixmap (~67 MB at high
+        // zoom) would be allocated here only to be `releaseStrokeCache()`'d
+        // immediately by `dispatchTileLayer` / `renderPage`. Off-screen-but-
+        // nearby pages keep using Capped (chooseRenderTier returns Capped
+        // when the tile doesn't intersect the viewport), so they still get
+        // the smooth-pan benefit of preload.
+        const qreal pageMaxDim = qMax(page->size.width(), page->size.height());
+        const bool wouldBeBlurred =
+            effScale * pageMaxDim > VectorLayer::MAX_STROKE_CACHE_DIM;
+        if (wouldBeBlurred && i >= first && i <= last) {
+            continue;
+        }
+
         // Pre-generate zoom-aware stroke cache for all layers on this page
         for (int layerIdx = 0; layerIdx < page->layerCount(); ++layerIdx) {
             VectorLayer* layer = page->layer(layerIdx);
@@ -13720,17 +13735,16 @@ void DocumentViewport::renderPage(QPainter& painter, Page* page, int pageIndex)
                 layer->releaseStrokeCache();
             }
 
-            // CR-2B-7: If this layer contains selected strokes, render with exclusion
-            // to hide originals (they'll be rendered transformed in renderLassoSelection)
+            // CR-2B-7: If this layer contains selected strokes, render with
+            // exclusion so the originals don't double-render under the lasso
+            // overlay. The tiered excluder also gets the high-zoom path under
+            // viewport clipping (fixes the previous "DPI cap bypassed when
+            // something is selected" symptom). Both dispatchers manage their
+            // own painter save/restore, so no extra wrapping needed here.
             if (hasSelectionOnThisPage && layerIdx == m_lassoSelection.sourceLayerIndex) {
-                // Lasso source layer: dispatch through the tiered excluder
-                // so the high-zoom path also gets viewport clipping (fixes
-                // the "DPI cap bypassed when something is selected" symptom).
-                painter.save();
                 layer->renderExcludingTiered(painter, excludeIds,
                                              pageSize, m_zoomLevel, dpr,
                                              tier, focusRect);
-                painter.restore();
             } else {
                 layer->renderTiered(painter, pageSize, m_zoomLevel, dpr,
                                     tier, focusRect);
