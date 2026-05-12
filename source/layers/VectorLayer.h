@@ -308,10 +308,16 @@ public:
         if (!visible || m_strokes.isEmpty()) {
             return;
         }
-        
+
+        // renderStroke mutates pen/brush on the outer painter and never
+        // restores them. Wrap the loop so callers (Page::render, thumbnail
+        // and export paths in MainWindow) see a clean painter state on return,
+        // matching the contract of renderExcluding.
+        painter.save();
         for (const auto& stroke : m_strokes) {
             renderStroke(painter, stroke);
         }
+        painter.restore();
     }
     
     /**
@@ -769,13 +775,19 @@ public:
             render(painter);
             return;
         }
-        
+
+        // renderStroke mutates pen/brush on the outer painter and never
+        // restores them. Without this save/restore, the last drawn stroke's
+        // brush leaks out and any later drawRect (e.g. the per-page border in
+        // DocumentViewport::renderPage) fills its area with the leaked color.
+        painter.save();
         painter.setRenderHint(QPainter::Antialiasing, true);
         for (const VectorStroke& stroke : m_strokes) {
             if (!excludeIds.contains(stroke.id)) {
                 renderStroke(painter, stroke);
             }
         }
+        painter.restore();
     }
 
     // ===== Direct (cache-free) render with bbox cull =====
