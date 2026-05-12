@@ -364,8 +364,10 @@ SpeedyNote supports multiple languages:
 
 - English
 - 简体中文 (Simplified Chinese)
-- Español (Spanish) (partial)
-- Français (French) (partial)
+- Español (Spanish) (Machine translated)
+- Français (French) (Machine translated)
+- German (Machine translated)
+- Brazilian Portuguese (Machine translated)
 
 > Contributions for additional translations are welcome!
 
