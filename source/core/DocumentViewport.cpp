@@ -191,6 +191,18 @@ DocumentViewport::DocumentViewport(QWidget* parent)
             this, &DocumentViewport::onApplicationStateChanged);
 #endif
     
+    // Focus-cache rebuild debounce. When the user is panning or zooming we
+    // skip Focus tier (cache-free Direct render) so we don't rebuild the
+    // viewport-clipped pixmap every frame. After 150 ms of stillness we
+    // clear the suspend flag and trigger one more paint that lets the focus
+    // cache build (and stays built across subsequent stationary paints).
+    m_focusRebuildTimer = new QTimer(this);
+    m_focusRebuildTimer->setSingleShot(true);
+    connect(m_focusRebuildTimer, &QTimer::timeout, this, [this]() {
+        m_focusCacheSuspended = false;
+        update();
+    });
+
     // Tablet hover timer - detects when stylus leaves viewport by timeout
     // When stylus hovers to another widget, we stop receiving TabletMove events.
     // This timer fires if no tablet hover event received within the interval.
@@ -233,6 +245,12 @@ DocumentViewport::~DocumentViewport()
     // Stop tablet hover timer (prevents lambda firing during destruction)
     if (m_tabletHoverTimer) {
         m_tabletHoverTimer->stop();
+    }
+
+    // Stop focus-cache rebuild debounce (prevents lambda from firing during
+    // destruction and dereferencing this).
+    if (m_focusRebuildTimer) {
+        m_focusRebuildTimer->stop();
     }
     
     // Stop touch handler gestures (including inertia timer)
@@ -950,7 +968,16 @@ void DocumentViewport::setZoomLevel(qreal zoom)
     if (qFuzzyCompare(m_zoomLevel, zoom)) {
         return;
     }
-    
+
+    // Pan/zoom is in flight: suspend the focus cache so the next paint
+    // takes the cache-free Direct tier instead of rebuilding a viewport-
+    // clipped pixmap every frame. The 150 ms timer will re-enable Focus
+    // tier and request one more paint when the user stops moving.
+    if (m_focusRebuildTimer) {
+        m_focusCacheSuspended = true;
+        m_focusRebuildTimer->start(150);
+    }
+
     qreal oldDpi = effectivePdfDpi();
     m_zoomLevel = zoom;
     qreal newDpi = effectivePdfDpi();
@@ -963,7 +990,13 @@ void DocumentViewport::setZoomLevel(qreal zoom)
     // Note: Stroke caches are zoom-aware and will rebuild automatically
     // when ensureStrokeCacheValid() is called with the new zoom level.
     // No explicit invalidation needed - just lazy rebuild on next paint.
-    
+
+    // If we just zoomed back below the divisor-one threshold, no page on
+    // screen will pick the Focus tier this paint - so any allocated focus
+    // pixmaps are dead weight. Eagerly release them to claw memory back
+    // immediately rather than waiting for the next eviction sweep.
+    releaseFocusCachesBelowThreshold();
+
     // Clamp pan offset (bounds change with zoom)
     clampPanOffset();
     
@@ -974,6 +1007,12 @@ void DocumentViewport::setZoomLevel(qreal zoom)
 
 void DocumentViewport::setPanOffset(QPointF offset)
 {
+    // Pan in flight: suspend the focus cache (see setZoomLevel for rationale).
+    if (m_focusRebuildTimer) {
+        m_focusCacheSuspended = true;
+        m_focusRebuildTimer->start(150);
+    }
+
     m_panOffset = offset;
     clampPanOffset();
     
@@ -4205,6 +4244,47 @@ void DocumentViewport::evictDistantTiles()
         qDebug() << "Evicted" << evictedCount << "tiles, remaining:" << m_document->tileCount();
     }
 #endif
+}
+
+void DocumentViewport::releaseFocusCachesBelowThreshold()
+{
+    if (!m_document) return;
+
+    const qreal effScale = m_zoomLevel * devicePixelRatioF();
+
+    auto maybeRelease = [effScale](Page* page) {
+        if (!page) return;
+        const qreal pageMaxDim = qMax(page->size.width(), page->size.height());
+        // Same predicate as `chooseRenderTier`: when this is false, no tile
+        // on this page would have picked Focus tier on the next paint.
+        if (effScale * pageMaxDim <= VectorLayer::MAX_STROKE_CACHE_DIM) {
+            for (int i = 0; i < page->layerCount(); ++i) {
+                if (auto* layer = page->layer(i)) {
+                    if (layer->hasFocusCacheAllocated()) {
+                        layer->releaseFocusCache();
+                    }
+                }
+            }
+        }
+    };
+
+    if (m_document->isEdgeless()) {
+        // Tiles all share `EDGELESS_TILE_SIZE`; check once, then sweep.
+        const qreal pageMaxDim = Document::EDGELESS_TILE_SIZE;
+        if (effScale * pageMaxDim > VectorLayer::MAX_STROKE_CACHE_DIM) {
+            return;  // Tiles still pick Focus tier; nothing to release.
+        }
+        for (const auto& coord : m_document->allLoadedTileCoords()) {
+            maybeRelease(m_document->getTile(coord.first, coord.second));
+        }
+    } else {
+        // Paged: only the visible page set could possibly hold focus caches
+        // (eviction sweep already cleared the rest); checking visible pages
+        // is enough.
+        for (int idx : visiblePages()) {
+            maybeRelease(m_document->page(idx));
+        }
+    }
 }
 
 // ===== Input Routing (Task 1.3.8) =====
@@ -13487,6 +13567,35 @@ int DocumentViewport::getPaintRate() const
 
 // ===== Rendering Helpers (Task 1.3.3) =====
 
+VectorLayer::RenderTier
+DocumentViewport::chooseRenderTier(const QSizeF& tileSize,
+                                   const QRectF& tileLocalViewport,
+                                   QRectF* outFocusRect) const
+{
+    using Tier = VectorLayer::RenderTier;
+    // Effective scale = how many physical screen pixels one logical unit
+    // produces. The capped pixmap cache hits the divisor when the long
+    // side at this scale exceeds MAX_STROKE_CACHE_DIM.
+    const qreal effScale = m_zoomLevel * devicePixelRatioF();
+    const qreal pageMaxDim = qMax(tileSize.width(), tileSize.height());
+    const bool wouldBeBlurred =
+        effScale * pageMaxDim > VectorLayer::MAX_STROKE_CACHE_DIM;
+
+    const QRectF tileBounds(QPointF(0, 0), tileSize);
+    // If the cap would not kick in at the current zoom, the legacy capped
+    // pixmap is sharp and small; nothing to gain from the focus cache.
+    // If the tile is entirely off-screen, the user can't see the blur, so
+    // keep the capped cache (also: focus rect would be empty here).
+    if (!wouldBeBlurred || !tileLocalViewport.intersects(tileBounds)) {
+        return Tier::Capped;
+    }
+
+    if (outFocusRect) {
+        *outFocusRect = tileLocalViewport.intersected(tileBounds);
+    }
+    return m_focusCacheSuspended ? Tier::Direct : Tier::Focus;
+}
+
 void DocumentViewport::renderPage(QPainter& painter, Page* page, int pageIndex)
 {
     if (!page || !m_document) return;
@@ -13589,23 +13698,42 @@ void DocumentViewport::renderPage(QPainter& painter, Page* page, int pageIndex)
         excludeIds = m_lassoSelection.getSelectedIds();
     }
     
+    // Pre-compute the tile-local viewport and tier choice once per page;
+    // every layer on the same page gets the same tier and the same focus
+    // rect (they share size and origin).
+    const QPointF pageOrigin = pagePosition(pageIndex);
+    const QRectF tileLocalVp = visibleRect().translated(-pageOrigin);
+    QRectF focusRect;
+    const VectorLayer::RenderTier tier =
+        chooseRenderTier(pageSize, tileLocalVp, &focusRect);
+
     for (int layerIdx = 0; layerIdx < page->layerCount(); ++layerIdx) {
         VectorLayer* layer = page->layer(layerIdx);
         bool layerIsVisible = layer && layer->visible;
         
         if (layerIsVisible) {
+            // When we won't draw from the capped pixmap this paint, free it
+            // outright - holding a 4096^2 pixmap per layer per page burns
+            // ~67 MB without serving any frame.
+            if (tier != VectorLayer::RenderTier::Capped &&
+                layer->hasStrokeCacheAllocated()) {
+                layer->releaseStrokeCache();
+            }
+
             // CR-2B-7: If this layer contains selected strokes, render with exclusion
             // to hide originals (they'll be rendered transformed in renderLassoSelection)
             if (hasSelectionOnThisPage && layerIdx == m_lassoSelection.sourceLayerIndex) {
-                // Render manually, skipping selected strokes (bypasses cache)
+                // Lasso source layer: dispatch through the tiered excluder
+                // so the high-zoom path also gets viewport clipping (fixes
+                // the "DPI cap bypassed when something is selected" symptom).
                 painter.save();
-                // painter.scale(m_zoomLevel, m_zoomLevel);
-                layer->renderExcluding(painter, excludeIds);
+                layer->renderExcludingTiered(painter, excludeIds,
+                                             pageSize, m_zoomLevel, dpr,
+                                             tier, focusRect);
                 painter.restore();
             } else {
-                // Use zoom-aware cache for maximum performance
-                // The painter is scaled by zoom, cache is at zoom * dpr resolution
-                layer->renderWithZoomCache(painter, pageSize, m_zoomLevel, dpr);
+                layer->renderTiered(painter, pageSize, m_zoomLevel, dpr,
+                                    tier, focusRect);
             }
         }
         
@@ -13746,7 +13874,7 @@ void DocumentViewport::renderEdgelessMode(QPainter& painter)
             
             painter.save();
             painter.translate(tileOrigin);
-            renderTileLayerStrokes(painter, tile, layerIdx);
+            renderTileLayerStrokes(painter, tile, layerIdx, coord);
             painter.restore();
         }
         
@@ -13822,6 +13950,45 @@ void DocumentViewport::renderEdgelessMode(QPainter& painter)
 // NOTE: renderTile() was removed (CR-2) - it was dead code duplicating 
 // renderEdgelessMode() + renderTileStrokes()
 
+void DocumentViewport::dispatchTileLayer(QPainter& painter, VectorLayer* layer,
+                                         int layerIdx,
+                                         const QSizeF& tileSize,
+                                         Document::TileCoord coord, qreal dpr,
+                                         const QSet<QString>& excludeIds)
+{
+    if (!layer || !layer->visible) return;
+
+    // Tile-local viewport for the tier dispatcher. The painter is already
+    // translated to the tile origin (in document coords); we just need to
+    // express the visible rect in the same tile-local frame.
+    const int tilePx = Document::EDGELESS_TILE_SIZE;
+    const QPointF tileOrigin(coord.first * tilePx, coord.second * tilePx);
+    const QRectF tileLocalVp = visibleRect().translated(-tileOrigin);
+    QRectF focusRect;
+    const VectorLayer::RenderTier tier =
+        chooseRenderTier(tileSize, tileLocalVp, &focusRect);
+
+    if (tier != VectorLayer::RenderTier::Capped &&
+        layer->hasStrokeCacheAllocated()) {
+        layer->releaseStrokeCache();
+    }
+
+    // CR-2B-7: If there's a selection on the active layer, exclude selected
+    // strokes. The lasso source layer goes through the tiered excluder so
+    // the high-zoom path also respects the focus rect (and the previous
+    // unbounded `renderExcluding` no longer bypasses the DPI cap).
+    const bool isLassoSourceLayer =
+        !excludeIds.isEmpty() && layerIdx == m_edgelessActiveLayerIndex;
+    if (isLassoSourceLayer) {
+        layer->renderExcludingTiered(painter, excludeIds,
+                                     tileSize, m_zoomLevel, dpr,
+                                     tier, focusRect);
+    } else {
+        layer->renderTiered(painter, tileSize, m_zoomLevel, dpr,
+                            tier, focusRect);
+    }
+}
+
 void DocumentViewport::renderTileStrokes(QPainter& painter, Page* tile, Document::TileCoord coord)
 {
     if (!tile) return;
@@ -13842,17 +14009,8 @@ void DocumentViewport::renderTileStrokes(QPainter& painter, Page* tile, Document
     }
     
     for (int layerIdx = 0; layerIdx < tile->layerCount(); ++layerIdx) {
-        VectorLayer* layer = tile->layer(layerIdx);
-        if (layer && layer->visible) {
-            // CR-2B-7: If there's a selection on the active layer, exclude selected strokes
-            if (!excludeIds.isEmpty() && layerIdx == m_edgelessActiveLayerIndex) {
-                // Render manually, skipping selected strokes
-                // Note: painter is already in tile-local coordinates
-                layer->renderExcluding(painter, excludeIds);
-            } else {
-                layer->renderWithZoomCache(painter, tileSize, m_zoomLevel, dpr);
-            }
-        }
+        dispatchTileLayer(painter, tile->layer(layerIdx), layerIdx,
+                          tileSize, coord, dpr, excludeIds);
     }
     
     // NOTE: Objects are now rendered via renderEdgelessObjectsWithAffinity()
@@ -13860,30 +14018,26 @@ void DocumentViewport::renderTileStrokes(QPainter& painter, Page* tile, Document
     // tile->renderObjects(painter, 1.0);  // REMOVED - handled by multi-pass
 }
 
-void DocumentViewport::renderTileLayerStrokes(QPainter& painter, Page* tile, int layerIdx)
+void DocumentViewport::renderTileLayerStrokes(QPainter& painter, Page* tile,
+                                              int layerIdx,
+                                              Document::TileCoord coord)
 {
     if (!tile) return;
     if (layerIdx < 0 || layerIdx >= tile->layerCount()) return;
-    
+
     VectorLayer* layer = tile->layer(layerIdx);
     if (!layer || !layer->visible) return;
-    
+
     QSizeF tileSize = tile->size;
     qreal dpr = devicePixelRatioF();
-    
+
     // CR-2B-7: Check if this layer has selected strokes that should be excluded
     QSet<QString> excludeIds;
     if (m_lassoSelection.isValid()) {
         excludeIds = m_lassoSelection.getSelectedIds();
     }
-    
-    // CR-2B-7: If there's a selection on the active layer, exclude selected strokes
-    if (!excludeIds.isEmpty() && layerIdx == m_edgelessActiveLayerIndex) {
-        // Render manually, skipping selected strokes
-        layer->renderExcluding(painter, excludeIds);
-    } else {
-        layer->renderWithZoomCache(painter, tileSize, m_zoomLevel, dpr);
-    }
+
+    dispatchTileLayer(painter, layer, layerIdx, tileSize, coord, dpr, excludeIds);
 }
 
 /**

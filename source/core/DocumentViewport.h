@@ -1942,6 +1942,15 @@ private:
     QPointF m_panOffset;
     int m_currentPageIndex = 0;
     bool m_needsPositionRestore = false;  ///< BUG FIX: Edgeless position needs restore in showEvent
+
+    // ===== Focus-cache pan/zoom debounce =====
+    /// True while pan or zoom is in flight: chooseRenderTier returns Direct
+    /// instead of Focus so we don't rebuild the focus pixmap every frame.
+    /// Cleared by m_focusRebuildTimer after the user stops moving for a beat.
+    bool m_focusCacheSuspended = false;
+    /// 150ms single-shot. Restarted on every setPanOffset / setZoomLevel.
+    /// On timeout, clears m_focusCacheSuspended and triggers an update().
+    QTimer* m_focusRebuildTimer = nullptr;
     
     // ===== Pan Tool State =====
     bool m_isPanToolDragging = false;
@@ -2744,7 +2753,16 @@ private:
      * and removes them from memory to bound memory usage.
      */
     void evictDistantTiles();
-    
+
+    /**
+     * @brief Release focus caches when zoom drops below the cap threshold.
+     *
+     * Called from `setZoomLevel`. Walks visible pages/tiles and frees the
+     * focus pixmap on any layer that no longer needs it (capped pixmap is
+     * sharp at this zoom). Cheap: each call is one null-check per layer.
+     */
+    void releaseFocusCachesBelowThreshold();
+
     // ===== Input Routing (Task 1.3.8) =====
     
     /**
@@ -3406,6 +3424,25 @@ private:
      * @param painter The QPainter to render to.
      */
     void renderEdgelessMode(QPainter& painter);
+
+    /**
+     * @brief Pick a render tier for one page or tile in the current paint.
+     * @param tileSize Size of the page or tile in logical units.
+     * @param tileLocalViewport The viewport's visible rect in page/tile-local
+     *                          coords (i.e. visibleRect().translated(-origin)).
+     * @param outFocusRect Out: when not Capped, the page/tile-local rect that
+     *                          the focus tier should cover (intersection of
+     *                          tileLocalViewport with the tile bounds).
+     *
+     * Returns Capped when the effective scale stays inside MAX_STROKE_CACHE_DIM
+     * (cap won't kick in -> the legacy whole-tile pixmap is sharp and small),
+     * or when the tile doesn't intersect the viewport (the user can't see the
+     * blur). Otherwise returns Focus when pan/zoom is settled, and Direct
+     * during an active pan/zoom (avoids rebuilding the focus pixmap mid-gesture).
+     */
+    VectorLayer::RenderTier chooseRenderTier(const QSizeF& tileSize,
+                                             const QRectF& tileLocalViewport,
+                                             QRectF* outFocusRect) const;
     
     /**
      * @brief Render a single tile's strokes and objects.
@@ -3424,8 +3461,30 @@ private:
      * @param painter The QPainter to render to (already translated to tile origin).
      * @param tile The tile (Page) to render from.
      * @param layerIdx The layer index to render.
+     * @param coord The tile coordinate (used to compute tile-local viewport
+     *              for the focus-cache tier dispatcher).
      */
-    void renderTileLayerStrokes(QPainter& painter, Page* tile, int layerIdx);
+    void renderTileLayerStrokes(QPainter& painter, Page* tile, int layerIdx,
+                                Document::TileCoord coord);
+
+    /**
+     * @brief Shared dispatch for one edgeless layer at a chosen render tier.
+     *
+     * Called by both `renderTileStrokes` (whole-tile loop) and
+     * `renderTileLayerStrokes` (single-layer call) so the focus-cache /
+     * direct / capped tier choice is identical between the two paths.
+     *
+     * @param painter Painter, already translated to tile origin.
+     * @param layer Layer to render.
+     * @param layerIdx Layer index (used for the lasso-source-layer check).
+     * @param tileSize Tile size in logical units.
+     * @param coord Tile coordinate (for tile origin computation).
+     * @param dpr Device pixel ratio.
+     * @param excludeIds Stroke IDs to exclude (lasso selection).
+     */
+    void dispatchTileLayer(QPainter& painter, VectorLayer* layer, int layerIdx,
+                           const QSizeF& tileSize, Document::TileCoord coord,
+                           qreal dpr, const QSet<QString>& excludeIds);
     
     /**
      * @brief Render objects with a specific affinity from all loaded tiles.
