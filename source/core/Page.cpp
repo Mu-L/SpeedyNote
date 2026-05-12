@@ -307,6 +307,11 @@ void Page::releaseLayerCaches()
     for (auto& layer : vectorLayers) {
         if (layer) {
             layer->releaseStrokeCache();
+            // Free the viewport-clipped focus cache too. A page outside the
+            // visible-pages keep range will not be repainted at high zoom in
+            // the foreseeable future, so the focus cache (max ~viewport*4
+            // bytes per layer) is dead weight.
+            layer->releaseFocusCache();
         }
     }
 }
@@ -314,7 +319,9 @@ void Page::releaseLayerCaches()
 bool Page::hasLayerCachesAllocated() const
 {
     for (const auto& layer : vectorLayers) {
-        if (layer && layer->hasStrokeCacheAllocated()) {
+        if (layer &&
+            (layer->hasStrokeCacheAllocated() ||
+             layer->hasFocusCacheAllocated())) {
             return true;
         }
     }

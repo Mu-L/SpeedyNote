@@ -37,8 +37,9 @@ foreach ($ts in $tsFiles) {
 # Open Qt Linguist for each .ts file that has unfinished translations.
 # By default only app_zh.ts is opened; uncomment or add lines for other languages.
 & $linguist resources/translations/app_zh.ts
-# & $linguist resources/translations/app_es.ts
-# & $linguist resources/translations/app_fr.ts
-# & $linguist resources/translations/app_de.ts
+& $linguist resources/translations/app_es.ts
+& $linguist resources/translations/app_fr.ts
+& $linguist resources/translations/app_de.ts
 # Add your language here, e.g.:
-# & $linguist resources/translations/app_de.ts
+& $linguist resources/translations/app_de.ts
+& $linguist resources/translations/app_pt.ts
