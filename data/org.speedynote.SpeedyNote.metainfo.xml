@@ -79,6 +79,16 @@
 
 
   <releases type="embedded">
+    <release version="1.4.5" date="2026-05-11">
+      <description>
+        <p>Bug Fixes and Improvements:</p>
+        <ul>
+          <li>Fixed the problem that the stroke could be pixelated at high zoom levels.</li>
+          <li>Fixed the problem that selected pen, marker and eraser presets were not persistently saved.</li>
+          <li>Fixed the problem that German and Portuguese translation files were not included in the release package.</li>
+        </ul>
+      </description>
+    </release>
   <release version="1.4.4" date="2026-05-04">
       <description>
         <p>New Features:</p>
