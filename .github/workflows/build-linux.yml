@@ -11,24 +11,34 @@ permissions:
   contents: write
 
 jobs:
+  # Build DEB inside a Debian 12 (Bookworm) container.
+  # Rationale: glibc and Qt6 are forward-compatible only. Building on the
+  # OLDEST supported target (Debian 12: glibc 2.36, Qt 6.4) yields a single
+  # .deb that installs on Debian 12/13 and Ubuntu 24.04/25.04/26.04.
+  # The `libqt6core6t64 | libqt6core6` alternate deps in build-package.sh
+  # handle the Debian/Ubuntu t64 transition at install time.
   build-deb:
-    name: Build DEB Package (Ubuntu/Debian)
+    name: Build DEB Package (amd64, Debian 12 base)
     runs-on: ubuntu-24.04
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    container:
+      image: debian:12-slim
 
+    steps:
       - name: Install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates \
+            git \
+            curl \
+            file \
+            sudo \
             cmake \
             make \
             pkg-config \
             qt6-base-dev \
             qt6-tools-dev \
-            qt6-svg-dev \
+            libqt6svg6-dev \
             libsdl2-dev \
             libasound2-dev \
             libmupdf-dev \
@@ -42,15 +52,108 @@ jobs:
             dpkg-dev \
             devscripts
 
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Build and create DEB package
         run: |
           chmod +x ./build-package.sh
           ./build-package.sh --deb
 
+      - name: Verify glibc compat (sanity check)
+        run: |
+          MAX_GLIBC=$(objdump -T build/speedynote 2>/dev/null \
+            | grep -oE 'GLIBC_[0-9]+\.[0-9]+' | sort -V | tail -1)
+          echo "Highest GLIBC symbol required: ${MAX_GLIBC:-none}"
+          # Debian 12 ships glibc 2.36; warn if we somehow exceed it.
+          if [ -n "$MAX_GLIBC" ]; then
+            VER="${MAX_GLIBC#GLIBC_}"
+            awk -v v="$VER" 'BEGIN{
+              split(v,a,".");
+              if (a[1]>2 || (a[1]==2 && a[2]>36)) {
+                print "WARNING: binary requires glibc " v " > 2.36 (Debian 12)";
+                exit 0;
+              }
+            }'
+          fi
+
       - name: Upload DEB package
         uses: actions/upload-artifact@v4
         with:
           name: speedynote-deb-amd64
+          path: "*.deb"
+
+      - name: Upload to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: "*.deb"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-deb-arm64:
+    name: Build DEB Package (arm64, Debian 12 base)
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: debian:12-slim
+
+    steps:
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates \
+            git \
+            curl \
+            file \
+            sudo \
+            cmake \
+            make \
+            pkg-config \
+            qt6-base-dev \
+            qt6-tools-dev \
+            libqt6svg6-dev \
+            libsdl2-dev \
+            libasound2-dev \
+            libmupdf-dev \
+            libharfbuzz-dev \
+            libfreetype-dev \
+            libjpeg-dev \
+            libopenjp2-7-dev \
+            libjbig2dec0-dev \
+            libgumbo-dev \
+            libmujs-dev \
+            dpkg-dev \
+            devscripts
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and create DEB package
+        run: |
+          chmod +x ./build-package.sh
+          ./build-package.sh --deb
+
+      - name: Verify glibc compat (sanity check)
+        run: |
+          MAX_GLIBC=$(objdump -T build/speedynote 2>/dev/null \
+            | grep -oE 'GLIBC_[0-9]+\.[0-9]+' | sort -V | tail -1)
+          echo "Highest GLIBC symbol required: ${MAX_GLIBC:-none}"
+          if [ -n "$MAX_GLIBC" ]; then
+            VER="${MAX_GLIBC#GLIBC_}"
+            awk -v v="$VER" 'BEGIN{
+              split(v,a,".");
+              if (a[1]>2 || (a[1]==2 && a[2]>36)) {
+                print "WARNING: binary requires glibc " v " > 2.36 (Debian 12)";
+                exit 0;
+              }
+            }'
+          fi
+
+      - name: Upload DEB package
+        uses: actions/upload-artifact@v4
+        with:
+          name: speedynote-deb-arm64
           path: "*.deb"
 
       - name: Upload to Release
@@ -112,27 +215,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Note: ARM64 builds require native ARM64 runners (ubuntu-24.04-arm64)
-  # which may not be available on all GitHub plans.
-  # Uncomment below when ARM64 runners are available:
-  #
-  # build-deb-arm64:
-  #   name: Build DEB Package (ARM64)
-  #   runs-on: ubuntu-24.04-arm64
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
-  #     - name: Install build dependencies
-  #       run: |
-  #         sudo apt-get update
-  #         sudo apt-get install -y cmake make pkg-config qt6-base-dev qt6-tools-dev \
-  #           libsdl2-dev libasound2-dev libmupdf-dev \
-  #           libharfbuzz-dev libfreetype-dev libjpeg-dev libopenjp2-7-dev \
-  #           dpkg-dev devscripts
-  #     - name: Build and create DEB package
-  #       run: ./build-package.sh --deb
-  #     - name: Upload DEB package
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: speedynote-deb-arm64
-  #         path: "*.deb"

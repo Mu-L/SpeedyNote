@@ -263,6 +263,16 @@ if(WIN32)
     configure_file(app_icon.rc.in "${CMAKE_CURRENT_BINARY_DIR}/app_icon.rc" @ONLY)
     set(WIN_RESOURCES "${CMAKE_CURRENT_BINARY_DIR}/app_icon.rc")
 
+    # Architecture suffix used in the installer filename and as a key for the
+    # Inno Setup #if MyArch == "arm64" gate (see packaging.iss.in).
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|ARM64|aarch64|AARCH64")
+        set(WIN_INSTALLER_ARCH "arm64")
+    elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+        set(WIN_INSTALLER_ARCH "x86")
+    else()
+        set(WIN_INSTALLER_ARCH "amd64")
+    endif()
+
     # Inno Setup script (version substituted from project(VERSION ...))
     configure_file(packaging.iss.in "${CMAKE_SOURCE_DIR}/packaging.iss" @ONLY)
 
