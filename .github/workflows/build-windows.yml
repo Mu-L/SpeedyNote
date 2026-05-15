@@ -48,8 +48,12 @@ jobs:
       - name: Check MuPDF installation
         run: |
           Write-Host "Checking MuPDF library files..." -ForegroundColor Cyan
-          $toolchainPath = "D:\a\_temp\msys64\clang64"
-          
+          # Derive MSYS2 location from RUNNER_TEMP so this job is portable
+          # across runner OS images (windows-latest is on D:, but GitHub
+          # could change that the way they did for windows-11-arm on C:).
+          $toolchainPath = "$env:RUNNER_TEMP\msys64\clang64"
+          Write-Host "Toolchain path: $toolchainPath" -ForegroundColor Cyan
+
           Write-Host "Looking for MuPDF in: $toolchainPath\lib" -ForegroundColor Gray
           Get-ChildItem -Path "$toolchainPath\lib" -Filter "*mupdf*" -ErrorAction SilentlyContinue | ForEach-Object {
             Write-Host "  Found: $($_.Name)" -ForegroundColor Green
@@ -68,7 +72,8 @@ jobs:
         timeout-minutes: 60
         run: |
           $ErrorActionPreference = "Stop"
-          $toolchainPath = "D:\a\_temp\msys64\clang64"
+          # See note in "Check MuPDF installation" — derive from RUNNER_TEMP.
+          $toolchainPath = "$env:RUNNER_TEMP\msys64\clang64"
           
           Write-Host "::group::Prepare build directory" -ForegroundColor Cyan
           if (Test-Path "build") { Remove-Item -Path "build" -Recurse -Force }
@@ -325,8 +330,19 @@ jobs:
 
       - name: Check MuPDF installation
         run: |
-          Write-Host "Checking MuPDF library files..." -ForegroundColor Cyan
-          $toolchainPath = "D:\a\_temp\msys64\clangarm64"
+          # NOTE: $env:RUNNER_TEMP differs by runner OS:
+          #   x64 runners (windows-latest)  → D:\a\_temp
+          #   arm runners (windows-11-arm)  → C:\a\_temp
+          # Always derive from $env:RUNNER_TEMP; never hardcode the drive.
+          $toolchainPath = "$env:RUNNER_TEMP\msys64\clangarm64"
+          Write-Host "Toolchain path: $toolchainPath" -ForegroundColor Cyan
+
+          if (-not (Test-Path $toolchainPath)) {
+            Write-Host "ERROR: $toolchainPath does not exist" -ForegroundColor Red
+            Write-Host "Listing $env:RUNNER_TEMP for diagnostics:" -ForegroundColor Yellow
+            Get-ChildItem -Path "$env:RUNNER_TEMP" -ErrorAction SilentlyContinue | Format-Table Name,LastWriteTime
+            exit 1
+          }
 
           Write-Host "Looking for MuPDF in: $toolchainPath\lib" -ForegroundColor Gray
           Get-ChildItem -Path "$toolchainPath\lib" -Filter "*mupdf*" -ErrorAction SilentlyContinue | ForEach-Object {
@@ -346,7 +362,8 @@ jobs:
         timeout-minutes: 75
         run: |
           $ErrorActionPreference = "Stop"
-          $toolchainPath = "D:\a\_temp\msys64\clangarm64"
+          # See note in "Check MuPDF installation" — derive from RUNNER_TEMP.
+          $toolchainPath = "$env:RUNNER_TEMP\msys64\clangarm64"
 
           Write-Host "::group::Prepare build directory" -ForegroundColor Cyan
           if (Test-Path "build") { Remove-Item -Path "build" -Recurse -Force }
@@ -371,17 +388,27 @@ jobs:
 
           $env:PATH = "$toolchainPath\bin;$env:PATH"
 
+          # Sanity check: confirm the MSYS2 clang is what's actually first on PATH.
+          # The windows-11-arm runner image preinstalls a system LLVM at
+          # C:\Program Files\LLVM that will silently win otherwise.
+          $clangResolved = (Get-Command clang.exe -ErrorAction SilentlyContinue).Source
+          Write-Host "clang on PATH: $clangResolved" -ForegroundColor Cyan
+
+          # Use forward-slashed full paths so CMake never has to search PATH
+          # for the compiler. Belt-and-suspenders against system LLVM hijack.
+          $toolchainPathFwd = $toolchainPath -replace '\\', '/'
+
           Write-Host "::group::Configure CMake" -ForegroundColor Cyan
           $cmakeArgs = @(
             "-G", "MinGW Makefiles",
-            "-DCMAKE_C_COMPILER=clang",
-            "-DCMAKE_CXX_COMPILER=clang++",
-            "-DCMAKE_MAKE_PROGRAM=mingw32-make",
+            "-DCMAKE_C_COMPILER=$toolchainPathFwd/bin/clang.exe",
+            "-DCMAKE_CXX_COMPILER=$toolchainPathFwd/bin/clang++.exe",
+            "-DCMAKE_MAKE_PROGRAM=$toolchainPathFwd/bin/mingw32-make.exe",
             "-DCMAKE_BUILD_TYPE=Release",
             "-DCMAKE_SYSTEM_PROCESSOR=arm64",
             "-DENABLE_DEBUG_OUTPUT=OFF",
-            "-DQT_PATH=$toolchainPath",
-            "-DSDL2_ROOT=$toolchainPath"
+            "-DQT_PATH=$toolchainPathFwd",
+            "-DSDL2_ROOT=$toolchainPathFwd"
           )
 
           & cmake @cmakeArgs ..
