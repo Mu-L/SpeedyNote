@@ -118,21 +118,30 @@ jobs:
       - name: Audit dynamic library dependencies
         run: |
           set -e
-          echo "=== NEEDED entries (DT_NEEDED) ==="
-          objdump -p build/speedynote | grep NEEDED
-          echo
           DEB_FILE=$(ls speedynote_*.deb 2>/dev/null | head -1)
           if [ -z "$DEB_FILE" ]; then
             echo "No .deb produced — failing audit." >&2
             exit 1
           fi
+
+          # Extract the binary from the .deb. We don't read build/speedynote
+          # because build-package.sh::cleanup() removes the build directory
+          # after packaging. Auditing the .deb's payload also matches what
+          # users actually install, so it's strictly more accurate.
+          rm -rf _audit && mkdir _audit
+          dpkg-deb -x "$DEB_FILE" _audit
+          BIN=_audit/usr/bin/speedynote
+
+          echo "=== NEEDED entries (DT_NEEDED) ==="
+          objdump -p "$BIN" | grep NEEDED
+          echo
           DEPENDS=$(dpkg-deb -f "$DEB_FILE" Depends)
           echo "Declared Depends: $DEPENDS"
           echo
           echo "=== Verifying every DT_NEEDED is covered by Depends: ==="
           ARCH_TRIPLET=$(dpkg-architecture -qDEB_HOST_MULTIARCH)
           MISSING=0
-          for lib in $(objdump -p build/speedynote | awk '/NEEDED/ {print $2}'); do
+          for lib in $(objdump -p "$BIN" | awk '/NEEDED/ {print $2}'); do
             # Skip the base-system / Qt-baseline libs that we never declare.
             case "$lib" in
               libc.so.*|libm.so.*|libpthread.so.*|libdl.so.*|librt.so.*|\
@@ -159,6 +168,12 @@ jobs:
             REAL=$(readlink -f "$LIB_PATH")
             OWNER=$(dpkg -S "$REAL" 2>/dev/null | head -1 | cut -d: -f1)
             [ -z "$OWNER" ] && OWNER=$(dpkg -S "$LIB_PATH" 2>/dev/null | head -1 | cut -d: -f1)
+            # usrmerge fallback: dpkg's DB often still registers files at
+            # /lib/$ARCH/* even though they live at /usr/lib/$ARCH/* on
+            # post-merge systems. Glob by basename to find the package.
+            if [ -z "$OWNER" ]; then
+              OWNER=$(dpkg -S "*/$(basename "$REAL")" 2>/dev/null | head -1 | cut -d: -f1)
+            fi
             OWNER="${OWNER%%:*}"
             if [ -z "$OWNER" ]; then
               echo "  [MISS-pkg] $lib ($REAL) — no Debian package owner"
@@ -276,21 +291,28 @@ jobs:
       - name: Audit dynamic library dependencies
         run: |
           set -e
-          echo "=== NEEDED entries (DT_NEEDED) ==="
-          objdump -p build/speedynote | grep NEEDED
-          echo
           DEB_FILE=$(ls speedynote_*.deb 2>/dev/null | head -1)
           if [ -z "$DEB_FILE" ]; then
             echo "No .deb produced — failing audit." >&2
             exit 1
           fi
+
+          # Extract the binary from the .deb (build/speedynote was deleted
+          # by build-package.sh::cleanup() after packaging).
+          rm -rf _audit && mkdir _audit
+          dpkg-deb -x "$DEB_FILE" _audit
+          BIN=_audit/usr/bin/speedynote
+
+          echo "=== NEEDED entries (DT_NEEDED) ==="
+          objdump -p "$BIN" | grep NEEDED
+          echo
           DEPENDS=$(dpkg-deb -f "$DEB_FILE" Depends)
           echo "Declared Depends: $DEPENDS"
           echo
           echo "=== Verifying every DT_NEEDED is covered by Depends: ==="
           ARCH_TRIPLET=$(dpkg-architecture -qDEB_HOST_MULTIARCH)
           MISSING=0
-          for lib in $(objdump -p build/speedynote | awk '/NEEDED/ {print $2}'); do
+          for lib in $(objdump -p "$BIN" | awk '/NEEDED/ {print $2}'); do
             case "$lib" in
               libc.so.*|libm.so.*|libpthread.so.*|libdl.so.*|librt.so.*|\
               libresolv.so.*|libnsl.so.*|libutil.so.*|ld-linux*.so.*|\
@@ -314,6 +336,10 @@ jobs:
             REAL=$(readlink -f "$LIB_PATH")
             OWNER=$(dpkg -S "$REAL" 2>/dev/null | head -1 | cut -d: -f1)
             [ -z "$OWNER" ] && OWNER=$(dpkg -S "$LIB_PATH" 2>/dev/null | head -1 | cut -d: -f1)
+            # usrmerge fallback: see amd64 audit step for explanation.
+            if [ -z "$OWNER" ]; then
+              OWNER=$(dpkg -S "*/$(basename "$REAL")" 2>/dev/null | head -1 | cut -d: -f1)
+            fi
             OWNER="${OWNER%%:*}"
             if [ -z "$OWNER" ]; then
               echo "  [MISS-pkg] $lib ($REAL) — no Debian package owner"
