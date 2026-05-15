@@ -354,6 +354,15 @@ detect_deb_runtime_deps() {
             owner_pkg=$(dpkg -S "$lib_path" 2>/dev/null | head -1 | cut -d: -f1)
         fi
         if [[ -z "$owner_pkg" ]]; then
+            # usrmerge path mismatch: on Debian 12 the file lives at
+            # /usr/lib/$ARCH/foo, but dpkg's database often registers it at
+            # the pre-merge /lib/$ARCH/foo path. Glob by basename so dpkg
+            # finds the package regardless of which path form was registered.
+            local basename_only
+            basename_only=$(basename "$real_path")
+            owner_pkg=$(dpkg -S "*/$basename_only" 2>/dev/null | head -1 | cut -d: -f1)
+        fi
+        if [[ -z "$owner_pkg" ]]; then
             echo -e "${RED}    [MISS-pkg] $soname ($real_path) — no Debian package owns this${NC}" >&2
             continue
         fi
