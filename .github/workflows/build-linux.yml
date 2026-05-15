@@ -27,14 +27,16 @@ jobs:
       - name: Install build dependencies
         run: |
           apt-get update
+          # debian:12-slim has no compiler by default; build-essential pulls
+          # in gcc, g++, libc6-dev, make, and dpkg-dev.
           apt-get install -y --no-install-recommends \
             ca-certificates \
             git \
             curl \
             file \
             sudo \
+            build-essential \
             cmake \
-            make \
             pkg-config \
             qt6-base-dev \
             qt6-tools-dev \
@@ -49,7 +51,6 @@ jobs:
             libjbig2dec0-dev \
             libgumbo-dev \
             libmujs-dev \
-            dpkg-dev \
             devscripts
 
       - name: Checkout code
@@ -101,14 +102,16 @@ jobs:
       - name: Install build dependencies
         run: |
           apt-get update
+          # debian:12-slim has no compiler by default; build-essential pulls
+          # in gcc, g++, libc6-dev, make, and dpkg-dev.
           apt-get install -y --no-install-recommends \
             ca-certificates \
             git \
             curl \
             file \
             sudo \
+            build-essential \
             cmake \
-            make \
             pkg-config \
             qt6-base-dev \
             qt6-tools-dev \
@@ -123,7 +126,6 @@ jobs:
             libjbig2dec0-dev \
             libgumbo-dev \
             libmujs-dev \
-            dpkg-dev \
             devscripts
 
       - name: Checkout code
