@@ -165,17 +165,25 @@ check_project_directory() {
 # Function to get the *baseline* dependencies for each distribution.
 # For .deb specifically, this is just Qt6 (with t64 alternates) — the
 # rest of the runtime deps are computed dynamically from the actual
-# binary contents in detect_deb_runtime_deps() below. That handles the
-# fact that CMakeLists.txt picks static-vs-dynamic MuPDF based on what
-# the build host has, which changes the binary's DT_NEEDED entries:
-#   - Build host has libmupdf.so (Debian 13+, Ubuntu 26.04+, etc.):
-#       binary's DT_NEEDED contains libmupdfXX.so.YY (one entry).
-#       libmujs and friends are transitive deps of libmupdf — apt will
-#       pull them in via libmupdf's own Depends.
-#   - Build host has only libmupdf.a (Debian 12, Ubuntu 24.04 LTS):
-#       MuPDF is fully embedded in the binary; DT_NEEDED instead lists
-#       libmujs.so.2, libharfbuzz.so.0, libfreetype.so.6, libjpeg.so.X,
+# binary contents by detect_deb_runtime_deps() below.
+#
+# Why dynamic detection: CMakeLists.txt picks static-vs-dynamic MuPDF
+# based on what the build host has, which changes DT_NEEDED:
+#   - libmupdf.so present (Debian 13+, Ubuntu 26.04+):
+#       DT_NEEDED contains libmupdfXX.so.YY only; harfbuzz/freetype/etc.
+#       come along transitively via libmupdf's own Depends.
+#   - libmupdf.a only (Debian 12, Ubuntu 24.04 LTS):
+#       MuPDF is embedded in the binary; DT_NEEDED instead lists
+#       libharfbuzz.so.0, libfreetype.so.6, libjpeg.so.62,
 #       libopenjp2.so.7, libjbig2dec.so.0, libgumbo.so.1 individually.
+#
+# Note on mujs: in CI we statically link our own libmujs.a (built from
+# upstream source) so libmujs.so.X is never in DT_NEEDED at all — that
+# avoids the libmujs2→libmujs3 SONAME break between Debian 12 and 13.
+# See the "Build static libmujs from source" step in build-linux.yml.
+# Local builds may still pick up the system's dynamic libmujs and add
+# libmujs2/libmujs3 to Depends; that's correct for that build host.
+#
 # As of v1.2.1, SpeedyNote uses MuPDF exclusively (Poppler removed).
 get_dependencies() {
     local format=$1
@@ -229,68 +237,139 @@ get_build_dependencies() {
 }
 
 # Function to detect the .deb's runtime Depends: from the actual built binary.
-# Walks the binary's DT_NEEDED entries (via ldd), maps each resolved library
-# path to its providing Debian package (via dpkg -S), and assembles a
-# Depends: line that accurately reflects what the binary will load at
-# runtime — regardless of whether MuPDF was statically or dynamically linked
-# at build time. Falls back to the static get_dependencies("deb") baseline
-# if ldd or dpkg are unavailable for some reason.
 #
-# Output: a single comma-separated dependency string suitable for the
-# control file's Depends: field (echoed to stdout).
+# Reads DT_NEEDED entries directly from the ELF header (via objdump -p),
+# locates each SONAME in the multi-arch library directories, resolves
+# symlinks, and queries dpkg -S to find the providing package. The result
+# accurately reflects what the binary will load at runtime — regardless of
+# whether MuPDF was statically or dynamically linked at build time.
 #
-# Why this is needed: hardcoding a Depends: list breaks every time the
-# build host's mupdf flavor changes, because static-mupdf and dynamic-mupdf
-# produce binaries with completely different DT_NEEDED entries. See the
-# block comment above get_dependencies() for the full breakdown.
+# Why objdump and not ldd:
+#   ldd actually invokes the dynamic linker to load the binary, which can
+#   silently fail in CI containers, on cross-arch builds, or on systems
+#   missing transitive libs — leaving us with empty/incomplete output and
+#   no error. objdump -p reads ELF headers without any runtime, so it sees
+#   every DT_NEEDED entry that's actually baked into the binary.
+#
+# Output: a comma-separated dependency string for the control file's
+# Depends: field. Verbose progress is logged to stderr so CI logs make it
+# obvious what was detected and what got mapped to a package.
+#
+# Exit status: 0 always; if no deps could be detected, falls back to the
+# get_dependencies("deb") baseline. The caller should also run the audit
+# step in build-linux.yml to verify Depends: covers every DT_NEEDED.
 detect_deb_runtime_deps() {
     local binary="$1"
     local base_deps
     base_deps=$(get_dependencies deb)
 
-    if [[ ! -f "$binary" ]] || ! command_exists ldd || ! command_exists dpkg; then
-        echo -e "${YELLOW}  (ldd or dpkg unavailable — using static dep list)${NC}" >&2
+    echo -e "${CYAN}  Analyzing $binary for runtime dependencies...${NC}" >&2
+
+    if [[ ! -f "$binary" ]]; then
+        echo -e "${RED}  ERROR: $binary not found — using static baseline${NC}" >&2
+        echo "$base_deps"
+        return
+    fi
+    if ! command_exists objdump; then
+        echo -e "${YELLOW}  objdump unavailable — using static baseline${NC}" >&2
+        echo "$base_deps"
+        return
+    fi
+    if ! command_exists dpkg; then
+        echo -e "${YELLOW}  dpkg unavailable — using static baseline${NC}" >&2
         echo "$base_deps"
         return
     fi
 
+    # Extract DT_NEEDED SONAMEs (one per line). Robust to objdump format
+    # variations: "  NEEDED               libfoo.so.X"
+    local sonames
+    sonames=$(objdump -p "$binary" 2>/dev/null \
+            | awk '/^[[:space:]]*NEEDED[[:space:]]/ {print $2}')
+
+    if [[ -z "$sonames" ]]; then
+        echo -e "${YELLOW}  No DT_NEEDED entries found by objdump — using static baseline${NC}" >&2
+        echo "$base_deps"
+        return
+    fi
+
+    echo -e "${CYAN}  Found $(echo "$sonames" | wc -l) DT_NEEDED entries:${NC}" >&2
+    for s in $sonames; do
+        echo "    - $s" >&2
+    done
+
+    # Multi-arch-aware library search dirs. Order matters: the per-arch
+    # GNU triplet dir is preferred so we get the right architecture's lib
+    # on a multi-arch host.
+    local arch_triplet
+    arch_triplet=$(dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null \
+                   || gcc -print-multiarch 2>/dev/null \
+                   || echo "")
+    local -a search_dirs=()
+    if [[ -n "$arch_triplet" ]]; then
+        search_dirs+=("/usr/lib/$arch_triplet" "/lib/$arch_triplet")
+    fi
+    search_dirs+=("/usr/lib" "/usr/lib64" "/lib" "/lib64")
+
     local extra_deps=""
     declare -A seen_pkgs
 
-    # Resolve each DT_NEEDED via ldd, then map the resolved path to a package.
-    # Skip libs that apt always has access to via libc6 / gcc-base / qt6-core
-    # (those are either provided by the implicit base system or already
-    # declared in the Qt6 alternates above).
-    while read -r lib_path; do
-        [[ -z "$lib_path" ]] && continue
-        [[ ! -f "$lib_path" ]] && continue
-
-        case "$lib_path" in
-            # libc6 / loader / libstdc++ / libgcc — implicit base system deps
-            */libc.so.*|*/libm.so.*|*/libpthread.so.*|*/libdl.so.*|*/librt.so.*|\
-            */libresolv.so.*|*/libnsl.so.*|*/libutil.so.*|*/ld-linux*|\
-            */libgcc_s.so.*|*/libstdc++.so.*)
+    local soname
+    for soname in $sonames; do
+        # Skip libs that the base system / Qt baseline already covers.
+        case "$soname" in
+            libc.so.*|libm.so.*|libpthread.so.*|libdl.so.*|librt.so.*|\
+            libresolv.so.*|libnsl.so.*|libutil.so.*|ld-linux*.so.*|\
+            libgcc_s.so.*|libstdc++.so.*)
+                echo -e "${YELLOW}    [skip-base] $soname${NC}" >&2
                 continue ;;
-            # Already declared with t64 alternates by get_dependencies()
-            */libQt6Core.so.*|*/libQt6Gui.so.*|*/libQt6Widgets.so.*)
+            libQt6Core.so.*|libQt6Gui.so.*|libQt6Widgets.so.*)
+                echo -e "${YELLOW}    [skip-qt6 ] $soname (declared with t64 alternates)${NC}" >&2
                 continue ;;
         esac
 
-        local owner_pkg
-        owner_pkg=$(dpkg -S "$lib_path" 2>/dev/null | head -1 | cut -d: -f1)
-        if [[ -z "$owner_pkg" ]]; then
-            echo -e "${YELLOW}  WARNING: $lib_path has no Debian package owner — skipping${NC}" >&2
+        # Locate the SONAME on the filesystem.
+        local lib_path=""
+        local d
+        for d in "${search_dirs[@]}"; do
+            if [[ -e "$d/$soname" ]]; then
+                lib_path="$d/$soname"
+                break
+            fi
+        done
+        if [[ -z "$lib_path" ]]; then
+            echo -e "${RED}    [MISS-fs ] $soname — not found in any library dir; CHECK BUILD ENV${NC}" >&2
             continue
         fi
-        # Strip :amd64 / :arm64 architecture suffix that dpkg sometimes emits.
+
+        # Resolve symlinks so dpkg -S finds the real file owner first.
+        local real_path
+        real_path=$(readlink -f "$lib_path" 2>/dev/null || echo "$lib_path")
+
+        local owner_pkg
+        owner_pkg=$(dpkg -S "$real_path" 2>/dev/null | head -1 | cut -d: -f1)
+        if [[ -z "$owner_pkg" ]]; then
+            # Some dev packages register the SONAME via the symlink path,
+            # not the realpath; try the symlink as a fallback.
+            owner_pkg=$(dpkg -S "$lib_path" 2>/dev/null | head -1 | cut -d: -f1)
+        fi
+        if [[ -z "$owner_pkg" ]]; then
+            echo -e "${RED}    [MISS-pkg] $soname ($real_path) — no Debian package owns this${NC}" >&2
+            continue
+        fi
+        # Strip :amd64 / :arm64 / :i386 architecture suffix.
         owner_pkg="${owner_pkg%%:*}"
 
-        if [[ -z "${seen_pkgs[$owner_pkg]:-}" ]]; then
-            seen_pkgs[$owner_pkg]=1
-            extra_deps="${extra_deps}, $owner_pkg"
+        if [[ -n "${seen_pkgs[$owner_pkg]:-}" ]]; then
+            echo -e "${CYAN}    [dedupe  ] $soname → $owner_pkg (already added)${NC}" >&2
+            continue
         fi
-    done < <(ldd "$binary" 2>/dev/null | awk '/=>/ && $3 != "" && $3 != "not" {print $3}')
+        seen_pkgs[$owner_pkg]=1
+        extra_deps="${extra_deps}, $owner_pkg"
+        echo -e "${GREEN}    [   ok   ] $soname → $owner_pkg${NC}" >&2
+    done
 
+    echo -e "${CYAN}  Final Depends: ${base_deps}${extra_deps}${NC}" >&2
     echo "${base_deps}${extra_deps}"
 }
 
