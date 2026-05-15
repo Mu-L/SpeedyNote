@@ -162,18 +162,27 @@ check_project_directory() {
     fi
 }
 
-# Function to get dependencies for each distribution
-# Note: MuPDF linking strategy varies by distro:
-#   - Ubuntu 24.04 (GitHub Actions): No libmupdf shared library available, uses static linking
-#   - Debian 13+ (Trixie): Has libmupdf25.1, can use dynamic linking
-#   - For local arm64 Debian builds with dynamic linking, manually add libmupdf25.1 to deps
-# As of v1.2.1, SpeedyNote uses MuPDF exclusively (Poppler removed)
+# Function to get the *baseline* dependencies for each distribution.
+# For .deb specifically, this is just Qt6 (with t64 alternates) — the
+# rest of the runtime deps are computed dynamically from the actual
+# binary contents in detect_deb_runtime_deps() below. That handles the
+# fact that CMakeLists.txt picks static-vs-dynamic MuPDF based on what
+# the build host has, which changes the binary's DT_NEEDED entries:
+#   - Build host has libmupdf.so (Debian 13+, Ubuntu 26.04+, etc.):
+#       binary's DT_NEEDED contains libmupdfXX.so.YY (one entry).
+#       libmujs and friends are transitive deps of libmupdf — apt will
+#       pull them in via libmupdf's own Depends.
+#   - Build host has only libmupdf.a (Debian 12, Ubuntu 24.04 LTS):
+#       MuPDF is fully embedded in the binary; DT_NEEDED instead lists
+#       libmujs.so.2, libharfbuzz.so.0, libfreetype.so.6, libjpeg.so.X,
+#       libopenjp2.so.7, libjbig2dec.so.0, libgumbo.so.1 individually.
+# As of v1.2.1, SpeedyNote uses MuPDF exclusively (Poppler removed).
 get_dependencies() {
     local format=$1
     case $format in
         deb)
-            # No libmupdf dependency - Ubuntu uses static linking (no shared lib available)
-            # For Debian 13+ arm64 builds with dynamic linking, add: libmupdf25.1
+            # Qt6 with t64 alternates only — additional deps are detected
+            # from the binary by detect_deb_runtime_deps().
             echo "libqt6core6t64 | libqt6core6, libqt6gui6t64 | libqt6gui6, libqt6widgets6t64 | libqt6widgets6"
             ;;
         rpm)
@@ -217,6 +226,72 @@ get_build_dependencies() {
             echo "cmake, make, pkgconf, qt6-qtbase-dev, qt6-qttools-dev, mupdf-dev, harfbuzz-dev, freetype-dev, libjpeg-turbo-dev, openjpeg-dev, jbig2dec-dev, gumbo-dev, mujs-dev"
             ;;
     esac
+}
+
+# Function to detect the .deb's runtime Depends: from the actual built binary.
+# Walks the binary's DT_NEEDED entries (via ldd), maps each resolved library
+# path to its providing Debian package (via dpkg -S), and assembles a
+# Depends: line that accurately reflects what the binary will load at
+# runtime — regardless of whether MuPDF was statically or dynamically linked
+# at build time. Falls back to the static get_dependencies("deb") baseline
+# if ldd or dpkg are unavailable for some reason.
+#
+# Output: a single comma-separated dependency string suitable for the
+# control file's Depends: field (echoed to stdout).
+#
+# Why this is needed: hardcoding a Depends: list breaks every time the
+# build host's mupdf flavor changes, because static-mupdf and dynamic-mupdf
+# produce binaries with completely different DT_NEEDED entries. See the
+# block comment above get_dependencies() for the full breakdown.
+detect_deb_runtime_deps() {
+    local binary="$1"
+    local base_deps
+    base_deps=$(get_dependencies deb)
+
+    if [[ ! -f "$binary" ]] || ! command_exists ldd || ! command_exists dpkg; then
+        echo -e "${YELLOW}  (ldd or dpkg unavailable — using static dep list)${NC}" >&2
+        echo "$base_deps"
+        return
+    fi
+
+    local extra_deps=""
+    declare -A seen_pkgs
+
+    # Resolve each DT_NEEDED via ldd, then map the resolved path to a package.
+    # Skip libs that apt always has access to via libc6 / gcc-base / qt6-core
+    # (those are either provided by the implicit base system or already
+    # declared in the Qt6 alternates above).
+    while read -r lib_path; do
+        [[ -z "$lib_path" ]] && continue
+        [[ ! -f "$lib_path" ]] && continue
+
+        case "$lib_path" in
+            # libc6 / loader / libstdc++ / libgcc — implicit base system deps
+            */libc.so.*|*/libm.so.*|*/libpthread.so.*|*/libdl.so.*|*/librt.so.*|\
+            */libresolv.so.*|*/libnsl.so.*|*/libutil.so.*|*/ld-linux*|\
+            */libgcc_s.so.*|*/libstdc++.so.*)
+                continue ;;
+            # Already declared with t64 alternates by get_dependencies()
+            */libQt6Core.so.*|*/libQt6Gui.so.*|*/libQt6Widgets.so.*)
+                continue ;;
+        esac
+
+        local owner_pkg
+        owner_pkg=$(dpkg -S "$lib_path" 2>/dev/null | head -1 | cut -d: -f1)
+        if [[ -z "$owner_pkg" ]]; then
+            echo -e "${YELLOW}  WARNING: $lib_path has no Debian package owner — skipping${NC}" >&2
+            continue
+        fi
+        # Strip :amd64 / :arm64 architecture suffix that dpkg sometimes emits.
+        owner_pkg="${owner_pkg%%:*}"
+
+        if [[ -z "${seen_pkgs[$owner_pkg]:-}" ]]; then
+            seen_pkgs[$owner_pkg]=1
+            extra_deps="${extra_deps}, $owner_pkg"
+        fi
+    done < <(ldd "$binary" 2>/dev/null | awk '/=>/ && $3 != "" && $3 != "not" {print $3}')
+
+    echo "${base_deps}${extra_deps}"
 }
 
 # Function to check packaging dependencies
@@ -397,14 +472,20 @@ create_deb_package() {
     mkdir -p "$PKG_DIR/usr/share/applications"
     mkdir -p "$PKG_DIR/usr/share/pixmaps"
     mkdir -p "$PKG_DIR/usr/share/doc/$PKGNAME"
-    
+
+    # Detect runtime deps from the actual binary (covers static vs dynamic
+    # MuPDF linkage; see comment on detect_deb_runtime_deps for details).
+    echo -e "${YELLOW}Detecting runtime dependencies from binary...${NC}"
+    DEB_DEPENDS=$(detect_deb_runtime_deps build/speedynote)
+    echo -e "${CYAN}  Depends: ${DEB_DEPENDS}${NC}"
+
     # Create control file
     cat > "$PKG_DIR/DEBIAN/control" << EOF
 Package: $PKGNAME
 Version: $PKGVER-$PKGREL
 Architecture: $(dpkg --print-architecture)
 Maintainer: $MAINTAINER
-Depends: $(get_dependencies deb)
+Depends: ${DEB_DEPENDS}
 Section: editors
 Priority: optional
 Homepage: $URL

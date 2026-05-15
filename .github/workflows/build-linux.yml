@@ -78,6 +78,47 @@ jobs:
             }'
           fi
 
+      - name: Audit dynamic library dependencies
+        run: |
+          echo "=== NEEDED entries (DT_NEEDED) ==="
+          objdump -p build/speedynote | grep NEEDED || true
+          echo
+          echo "=== Checking each NEEDED lib has a Depends: entry in the .deb ==="
+          DEB_FILE=$(ls speedynote_*.deb 2>/dev/null | head -1)
+          if [ -z "$DEB_FILE" ]; then
+            echo "No .deb found — skipping audit."
+            exit 0
+          fi
+          DEPENDS=$(dpkg-deb -f "$DEB_FILE" Depends)
+          echo "Depends: $DEPENDS"
+          echo
+          MISSING=0
+          for lib in $(objdump -p build/speedynote | awk '/NEEDED/ {print $2}'); do
+            # Resolve which package owns this SONAME on the build host.
+            OWNER=$(dpkg -S "/$lib" 2>/dev/null \
+                  || dpkg -S "*/$lib" 2>/dev/null \
+                  || true)
+            OWNER_PKG=$(echo "$OWNER" | head -1 | cut -d: -f1)
+            if [ -z "$OWNER_PKG" ]; then
+              echo "  [skip] $lib  (provided by glibc/ld.so or unowned)"
+              continue
+            fi
+            # Strip :amd64 / :arm64 architecture suffix for comparison.
+            OWNER_PKG_BASE="${OWNER_PKG%%:*}"
+            if echo "$DEPENDS" | grep -qE "(^|[ ,|])$OWNER_PKG_BASE([ ,|]|$)"; then
+              echo "  [ok]   $lib  ←  $OWNER_PKG_BASE"
+            else
+              echo "  [MISS] $lib  ←  $OWNER_PKG_BASE  (not in Depends:)"
+              MISSING=$((MISSING+1))
+            fi
+          done
+          if [ "$MISSING" -gt 0 ]; then
+            echo
+            echo "WARNING: $MISSING dynamic dependency/dependencies not declared."
+            echo "Update get_dependencies() in build-package.sh."
+            # Don't fail the build — just visible in logs.
+          fi
+
       - name: Upload DEB package
         uses: actions/upload-artifact@v4
         with:
@@ -150,6 +191,44 @@ jobs:
                 exit 0;
               }
             }'
+          fi
+
+      - name: Audit dynamic library dependencies
+        run: |
+          echo "=== NEEDED entries (DT_NEEDED) ==="
+          objdump -p build/speedynote | grep NEEDED || true
+          echo
+          echo "=== Checking each NEEDED lib has a Depends: entry in the .deb ==="
+          DEB_FILE=$(ls speedynote_*.deb 2>/dev/null | head -1)
+          if [ -z "$DEB_FILE" ]; then
+            echo "No .deb found — skipping audit."
+            exit 0
+          fi
+          DEPENDS=$(dpkg-deb -f "$DEB_FILE" Depends)
+          echo "Depends: $DEPENDS"
+          echo
+          MISSING=0
+          for lib in $(objdump -p build/speedynote | awk '/NEEDED/ {print $2}'); do
+            OWNER=$(dpkg -S "/$lib" 2>/dev/null \
+                  || dpkg -S "*/$lib" 2>/dev/null \
+                  || true)
+            OWNER_PKG=$(echo "$OWNER" | head -1 | cut -d: -f1)
+            if [ -z "$OWNER_PKG" ]; then
+              echo "  [skip] $lib  (provided by glibc/ld.so or unowned)"
+              continue
+            fi
+            OWNER_PKG_BASE="${OWNER_PKG%%:*}"
+            if echo "$DEPENDS" | grep -qE "(^|[ ,|])$OWNER_PKG_BASE([ ,|]|$)"; then
+              echo "  [ok]   $lib  ←  $OWNER_PKG_BASE"
+            else
+              echo "  [MISS] $lib  ←  $OWNER_PKG_BASE  (not in Depends:)"
+              MISSING=$((MISSING+1))
+            fi
+          done
+          if [ "$MISSING" -gt 0 ]; then
+            echo
+            echo "WARNING: $MISSING dynamic dependency/dependencies not declared."
+            echo "Update get_dependencies() in build-package.sh."
           fi
 
       - name: Upload DEB package
