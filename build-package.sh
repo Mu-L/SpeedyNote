@@ -137,6 +137,62 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Copy Qt's own translation catalogs (qtbase_<lang>.qm) for each language
+# the app supports into the supplied destination dir. These hold the
+# QMessageBox / QFileDialog standard button strings (Save / Discard /
+# Cancel / Open / Yes / No / ...) that source/Main.cpp's translator loads
+# alongside our app_<lang>.qm. Without them those buttons render in
+# English even when the rest of the UI is translated.
+#
+# Filenames match upstream Qt 6: zh and pt only ship with region suffixes
+# (qtbase_zh_CN.qm, qtbase_pt_BR.qm); the QLocale-aware loader probes the
+# regional fallback chain automatically.
+#
+# Discovery order: qmake6 -> qmake -> /usr/share/qt6/translations ->
+# /usr/share/qt5/translations -> /usr/share/qt/translations. Missing
+# source files are warnings, not errors, so a build host that is missing
+# some catalogs still produces a package.
+copy_qt_translations() {
+    local dest_dir="$1"
+    if [[ -z "$dest_dir" ]]; then
+        echo -e "${YELLOW}copy_qt_translations: missing destination${NC}"
+        return 0
+    fi
+
+    local qt_tr_dir=""
+    if command_exists qmake6; then
+        qt_tr_dir=$(qmake6 -query QT_INSTALL_TRANSLATIONS 2>/dev/null || true)
+    fi
+    if [[ -z "$qt_tr_dir" || ! -d "$qt_tr_dir" ]] && command_exists qmake; then
+        qt_tr_dir=$(qmake -query QT_INSTALL_TRANSLATIONS 2>/dev/null || true)
+    fi
+    for fallback in /usr/share/qt6/translations /usr/share/qt5/translations /usr/share/qt/translations; do
+        if [[ -z "$qt_tr_dir" || ! -d "$qt_tr_dir" ]] && [[ -d "$fallback" ]]; then
+            qt_tr_dir="$fallback"
+        fi
+    done
+
+    if [[ -z "$qt_tr_dir" || ! -d "$qt_tr_dir" ]]; then
+        echo -e "${YELLOW}WARNING: Qt translation prefix not found; standard dialog buttons may render in English.${NC}"
+        return 0
+    fi
+
+    mkdir -p "$dest_dir"
+    local copied=0
+    # Keep in sync with the _SUPPORTED_QTBASE_QM list in CMakeLists.txt, the
+    # $supportedQtbase array in compile.ps1, and the inline qtbase loops in
+    # the rpm spec / Arch PKGBUILD / Alpine APKBUILD heredocs below.
+    local qtbase_files=(qtbase_de.qm qtbase_es.qm qtbase_fr.qm qtbase_pt_BR.qm qtbase_zh_CN.qm qtbase_en.qm)
+    for f in "${qtbase_files[@]}"; do
+        if [[ -f "$qt_tr_dir/$f" ]]; then
+            cp "$qt_tr_dir/$f" "$dest_dir/" 2>/dev/null && copied=$((copied + 1))
+        else
+            echo -e "${YELLOW}   (skip - not found in $qt_tr_dir: $f)${NC}"
+        fi
+    done
+    echo -e "${CYAN}Copied $copied qtbase_*.qm catalog(s) from $qt_tr_dir${NC}"
+}
+
 # Function to detect architecture
 detect_architecture() {
     local arch=$(uname -m)
@@ -516,6 +572,8 @@ build_project() {
         echo -e "${YELLOW}Copying translation files...${NC}"
         cp resources/translations/*.qm build/ 2>/dev/null || true
     fi
+    # Also ship Qt's own qtbase_<lang>.qm so standard dialog buttons translate.
+    copy_qt_translations "build"
     
     cd build
     
@@ -627,6 +685,7 @@ EOF
     if [ -d "resources/translations" ]; then
         cp resources/translations/*.qm "$PKG_DIR/usr/share/speedynote/translations/" 2>/dev/null || true
     fi
+    copy_qt_translations "$PKG_DIR/usr/share/speedynote/translations"
     
     # Install desktop file from committed source
     cp data/org.speedynote.SpeedyNote.desktop "$PKG_DIR/usr/share/applications/org.speedynote.SpeedyNote.desktop"
@@ -704,6 +763,20 @@ mkdir -p %{buildroot}/usr/share/speedynote/translations
 if [ -d "resources/translations" ]; then
     cp resources/translations/*.qm %{buildroot}/usr/share/speedynote/translations/ 2>/dev/null || true
 fi
+# Ship Qt's own qtbase_<lang>.qm catalogs so standard dialog buttons translate.
+# All \$-variables are escaped so they reach the spec literally and are
+# expanded by rpmbuild, not by the outer build-package.sh heredoc.
+for f in qtbase_de.qm qtbase_es.qm qtbase_fr.qm qtbase_pt_BR.qm qtbase_zh_CN.qm qtbase_en.qm; do
+    for tr_dir in \$(qmake6 -query QT_INSTALL_TRANSLATIONS 2>/dev/null) \\
+                  \$(qmake   -query QT_INSTALL_TRANSLATIONS 2>/dev/null) \\
+                  /usr/share/qt6/translations /usr/share/qt5/translations \\
+                  /usr/share/qt/translations; do
+        if [ -f "\$tr_dir/\$f" ]; then
+            cp "\$tr_dir/\$f" %{buildroot}/usr/share/speedynote/translations/ 2>/dev/null || true
+            break
+        fi
+    done
+done
 
 # Install committed desktop file
 install -Dm644 data/org.speedynote.SpeedyNote.desktop %{buildroot}/usr/share/applications/org.speedynote.SpeedyNote.desktop
@@ -806,7 +879,24 @@ package() {
             fi
         done
     fi
-    
+
+    # Ship Qt's own qtbase_<lang>.qm catalogs so QMessageBox / QFileDialog
+    # standard buttons (Save/Discard/Cancel/Open/...) translate together with
+    # the rest of the UI. Escaped so makepkg, not the outer build script,
+    # expands the variables.
+    install -dm755 "\$pkgdir/usr/share/speedynote/translations"
+    for f in qtbase_de.qm qtbase_es.qm qtbase_fr.qm qtbase_pt_BR.qm qtbase_zh_CN.qm qtbase_en.qm; do
+        for tr_dir in \$(qmake6 -query QT_INSTALL_TRANSLATIONS 2>/dev/null) \\
+                      \$(qmake   -query QT_INSTALL_TRANSLATIONS 2>/dev/null) \\
+                      /usr/share/qt6/translations /usr/share/qt5/translations \\
+                      /usr/share/qt/translations; do
+            if [ -f "\$tr_dir/\$f" ]; then
+                install -m644 "\$tr_dir/\$f" "\$pkgdir/usr/share/speedynote/translations/"
+                break
+            fi
+        done
+    done
+
     # Install committed desktop file
     install -Dm644 "data/org.speedynote.SpeedyNote.desktop" "\$pkgdir/usr/share/applications/org.speedynote.SpeedyNote.desktop"
 }
@@ -904,7 +994,23 @@ package() {
             fi
         done
     fi
-    
+
+    # Ship Qt's own qtbase_<lang>.qm catalogs so QMessageBox / QFileDialog
+    # standard buttons translate. Variables are escaped so abuild expands
+    # them, not the outer build script.
+    install -dm755 "\$pkgdir/usr/share/speedynote/translations"
+    for f in qtbase_de.qm qtbase_es.qm qtbase_fr.qm qtbase_pt_BR.qm qtbase_zh_CN.qm qtbase_en.qm; do
+        for tr_dir in \$(qmake6 -query QT_INSTALL_TRANSLATIONS 2>/dev/null) \\
+                      \$(qmake   -query QT_INSTALL_TRANSLATIONS 2>/dev/null) \\
+                      /usr/share/qt6/translations /usr/share/qt5/translations \\
+                      /usr/share/qt/translations; do
+            if [ -f "\$tr_dir/\$f" ]; then
+                install -m644 "\$tr_dir/\$f" "\$pkgdir/usr/share/speedynote/translations/"
+                break
+            fi
+        done
+    done
+
     # Install committed desktop file
     install -Dm644 "data/org.speedynote.SpeedyNote.desktop" "\$pkgdir/usr/share/applications/org.speedynote.SpeedyNote.desktop"
 }

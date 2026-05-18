@@ -1301,26 +1301,39 @@ bool DocumentViewport::hasPositionHistory() const
     return !m_edgelessPositionHistory.isEmpty();
 }
 
-void DocumentViewport::syncPositionToDocument()
+bool DocumentViewport::syncPositionToDocument()
 {
     // Only applies to edgeless mode
     if (!m_document || !m_document->isEdgeless()) {
-        return;
+        return false;
     }
-    
-    // Save current viewport center position
-    QPointF currentPos = currentCenterPosition();
-    m_document->setEdgelessLastPosition(currentPos);
-    
-    // QList is already in oldest-to-newest order
+
+    // currentCenterPosition() is deterministic w.r.t. m_panOffset/m_zoomLevel,
+    // and applyRestoredEdgelessPosition() initialises m_panOffset from
+    // lastPosition with the inverse math, so an untouched doc compares byte-
+    // for-byte equal here. That lets close-time autosave skip a full bundle
+    // rewrite when the user opens and closes without panning.
+    const QPointF currentPos = currentCenterPosition();
     QVector<QPointF> historyVec(m_edgelessPositionHistory.cbegin(),
                                 m_edgelessPositionHistory.cend());
-    m_document->setEdgelessPositionHistory(historyVec);
-    
+
+    bool changed = false;
+    if (m_document->edgelessLastPosition() != currentPos) {
+        m_document->setEdgelessLastPosition(currentPos);
+        changed = true;
+    }
+    if (m_document->edgelessPositionHistory() != historyVec) {
+        m_document->setEdgelessPositionHistory(historyVec);
+        changed = true;
+    }
+
 #ifdef SPEEDYNOTE_DEBUG
     qDebug() << "[PositionHistory] Synced to document: lastPos =" << currentPos
-             << "| history size =" << historyVec.size();
+             << "| history size =" << historyVec.size()
+             << "| changed =" << changed;
 #endif
+
+    return changed;
 }
 
 bool DocumentViewport::applyRestoredEdgelessPosition()

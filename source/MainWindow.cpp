@@ -594,21 +594,11 @@ MainWindow::MainWindow(QWidget *parent)
             return;
         }
         
-        bool isUsingTemp = m_documentManager->isUsingTempBundle(doc);
-        bool positionChanged = syncDocumentPosition(doc, vp);
-        
-        if (positionChanged && !isUsingTemp && !doc->modified) {
-            QString existingPath = m_documentManager->documentPath(doc);
-            if (!existingPath.isEmpty()) {
-#ifdef SPEEDYNOTE_DEBUG
-                qDebug() << "tabCloseAttempted: Auto-saving to persist position";
-#endif
-                m_documentManager->saveDocument(doc);
-            }
-        }
-        
+        autosavePositionOnlyChange(doc, vp);
+
+        const bool isUsingTemp = m_documentManager->isUsingTempBundle(doc);
         bool needsSavePrompt = false;
-        
+
         if (doc->isEdgeless()) {
             bool hasContent = doc->tileCount() > 0 || doc->tileIndexCount() > 0;
             needsSavePrompt = doc->modified || (isUsingTemp && hasContent);
@@ -7346,10 +7336,10 @@ bool MainWindow::syncDocumentPosition(Document* doc, DocumentViewport* vp)
     }
     
     if (doc->isEdgeless()) {
-        // Edgeless: sync canvas position/zoom to document
-        // Note: syncPositionToDocument() updates internal state but doesn't mark modified
-        vp->syncPositionToDocument();
-        return true;  // Position always "changes" for edgeless (can't easily detect)
+        // Edgeless: sync canvas position/zoom and report honestly whether
+        // anything actually changed. Returning false for an untouched doc
+        // lets autosavePositionOnlyChange skip a full bundle rewrite.
+        return vp->syncPositionToDocument();
     } else {
         // Paged: update lastAccessedPage if changed
         int currentPage = vp->currentPageIndex();
@@ -7377,6 +7367,33 @@ void MainWindow::syncAllDocumentPositions()
             }
         }
     });
+}
+
+void MainWindow::autosavePositionOnlyChange(Document* doc, DocumentViewport* vp)
+{
+    // Persist ephemeral view state (edgeless last_position / paged
+    // lastAccessedPage) without ever flipping doc->modified. After this
+    // returns, doc->modified reflects only REAL user edits, so close-time
+    // prompts (both tab-close and app-close) can use it directly.
+    //
+    // syncDocumentPosition now returns false for an untouched doc (edgeless
+    // included), so this short-circuits to zero I/O in the common "opened
+    // and closed without panning" case.
+    if (!doc || !vp || !m_documentManager) {
+        return;
+    }
+    const bool isUsingTemp = m_documentManager->isUsingTempBundle(doc);
+    const bool positionChanged = syncDocumentPosition(doc, vp);
+    if (positionChanged && !isUsingTemp && !doc->modified) {
+        const QString existingPath = m_documentManager->documentPath(doc);
+        if (!existingPath.isEmpty()) {
+#ifdef SPEEDYNOTE_DEBUG
+            qDebug() << "autosavePositionOnlyChange: persisting position for"
+                     << doc->displayName();
+#endif
+            m_documentManager->saveDocument(doc);
+        }
+    }
 }
 
 // ============================================================================
@@ -8466,21 +8483,23 @@ void MainWindow::saveSessionTabs()
 }
 
 void MainWindow::closeEvent(QCloseEvent *event) {
-    // ========== UPDATE POSITIONS FOR ALL DOCUMENTS ==========
-    // Before checking for unsaved changes, update positions for all documents
-    // This ensures the position is saved even if the document was saved earlier in the session
-    syncAllDocumentPositions();
-    
     // ========== CHECK FOR UNSAVED DOCUMENTS ==========
-    // Iterate through all tabs across both panes and prompt for unsaved documents
-    // Returns false if user cancelled (abort quit)
+    // Per-tab: silently persist ephemeral view state (edgeless last_position /
+    // paged lastAccessedPage) via autosavePositionOnlyChange, then prompt only
+    // when doc->modified reflects a real edit. This mirrors tabCloseAttempted,
+    // so closing the app feels the same as closing individual tabs.
+    // (syncAllDocumentPositions is intentionally NOT called here - it would
+    // markModified every edgeless doc and force a prompt for harmless pans.
+    // The mobile suspend hook still uses it, where that behavior is needed.)
     if (m_splitViewManager && m_documentManager) {
         auto checkPane = [&](TabManager* tm, TabBar* bar) -> bool {
             if (!tm) return true;
             for (int i = 0; i < tm->tabCount(); ++i) {
                 Document* doc = tm->documentAt(i);
                 if (!doc) continue;
-                
+
+                autosavePositionOnlyChange(doc, tm->viewportAt(i));
+
                 bool needsSavePrompt = false;
                 bool isUsingTemp = m_documentManager->isUsingTempBundle(doc);
                 
