@@ -466,6 +466,21 @@ private:
      * Used before auto-save (Android) and before closeEvent checks.
      */
     void syncAllDocumentPositions();
+
+    /**
+     * @brief Sync position and silently auto-save if the only change is the position.
+     *
+     * Used by both tab-close and app-close to persist ephemeral view state
+     * (edgeless last_position / paged lastAccessedPage) without flipping
+     * doc->modified. After this call, doc->modified reflects only real edits,
+     * so callers can use it directly to decide whether to prompt the user.
+     *
+     * Auto-saves only when: position actually changed, the doc is NOT a temp
+     * bundle, the doc was not already modified, and a permanent path exists.
+     * Mobile autosave continues to use syncAllDocumentPositions() above
+     * because it relies on markModified to drive autoSaveModifiedDocuments.
+     */
+    void autosavePositionOnlyChange(Document* doc, DocumentViewport* vp);
     
     /**
      * @brief Save a new document with dialog prompt (Android-aware).
