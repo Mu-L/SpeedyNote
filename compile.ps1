@@ -293,6 +293,10 @@ if (Test-Path $qmakeExe) {
     $qtTranslationsPath = (& $qmakeExe -query QT_INSTALL_TRANSLATIONS 2>$null) | Select-Object -First 1
 }
 if ($qtTranslationsPath -and (Test-Path $qtTranslationsPath)) {
+    # Keep in sync with the _SUPPORTED_QTBASE_QM list in CMakeLists.txt and
+    # the qtbase_files arrays in build-package.sh (helper + spec/PKGBUILD/
+    # APKBUILD heredocs). When a new app language is added all four sites
+    # need to be extended.
     $supportedQtbase = @(
         'qtbase_de.qm','qtbase_es.qm','qtbase_fr.qm',
         'qtbase_pt_BR.qm','qtbase_zh_CN.qm','qtbase_en.qm'

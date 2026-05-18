@@ -637,9 +637,110 @@ else()
 endif()
 
 # ============================================================================
+# ============================================================================
+# Qt translation catalogs (qtbase_<lang>.qm)
+# ============================================================================
+# These hold the QMessageBox / QFileDialog standard button strings
+# (Save / Discard / Cancel / Open / Yes / No / ...). Without them the loader
+# in source/Main.cpp falls back to English even when the rest of the UI is
+# translated.
+#
+# Two deploy paths:
+#   - Desktop (Windows / macOS / Linux): copied as loose files next to the
+#     binary or into share/speedynote/translations via _install_qtbase_translations.
+#   - Mobile (iOS / Android): no on-disk filesystem layout to rely on, so we
+#     embed the files into the binary via a generated qt_translations.qrc
+#     and the loader picks them up from :/qt-translations/.
+#
+# IMPORTANT: When a new app language is added, also extend the list below,
+# the compile.ps1 $supportedQtbase array, and the qtbase_files arrays in
+# build-package.sh (helper + spec/PKGBUILD/APKBUILD heredocs).
+set(_SUPPORTED_QTBASE_QM
+    qtbase_de.qm
+    qtbase_es.qm
+    qtbase_fr.qm
+    qtbase_pt_BR.qm
+    qtbase_zh_CN.qm
+    qtbase_en.qm
+)
+
+set(_QT_TRANSLATIONS_DIR "")
+if(TARGET Qt6::qmake)
+    get_target_property(_qmake_exe Qt6::qmake IMPORTED_LOCATION)
+elseif(TARGET Qt5::qmake)
+    get_target_property(_qmake_exe Qt5::qmake IMPORTED_LOCATION)
+else()
+    set(_qmake_exe "")
+endif()
+if(_qmake_exe AND EXISTS "${_qmake_exe}")
+    execute_process(
+        COMMAND "${_qmake_exe}" -query QT_INSTALL_TRANSLATIONS
+        OUTPUT_VARIABLE _QT_TRANSLATIONS_DIR
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE _qmake_query_result
+        ERROR_QUIET
+    )
+    if(NOT _qmake_query_result EQUAL 0)
+        set(_QT_TRANSLATIONS_DIR "")
+    endif()
+endif()
+
+# Helper used by the desktop install section below. Emits one install(FILES)
+# rule per existing qtbase_*.qm; missing catalogs are silently skipped.
+function(_install_qtbase_translations DEST)
+    if(NOT _QT_TRANSLATIONS_DIR)
+        return()
+    endif()
+    foreach(_qm IN LISTS _SUPPORTED_QTBASE_QM)
+        if(EXISTS "${_QT_TRANSLATIONS_DIR}/${_qm}")
+            install(FILES "${_QT_TRANSLATIONS_DIR}/${_qm}" DESTINATION "${DEST}")
+        endif()
+    endforeach()
+endfunction()
+
+# Mobile builds: embed qtbase_*.qm into the binary via a generated qrc.
+# We can't rely on the on-disk paths Main.cpp's loader uses (no /usr/share,
+# applicationDirPath() is the app data sandbox, and androiddeployqt's own
+# translation bundling only includes the legacy qt_*.qm aggregated catalog
+# which lacks the Qt 6 widget strings). The loader checks :/qt-translations
+# as a universal fallback so this works on every platform if needed.
+set(_QT_TRANSLATIONS_QRC "")
+if(IOS OR ANDROID)
+    if(_QT_TRANSLATIONS_DIR)
+        set(_qrc_body "<RCC>\n  <qresource prefix=\"/qt-translations\">\n")
+        set(_qrc_has_files FALSE)
+        foreach(_qm IN LISTS _SUPPORTED_QTBASE_QM)
+            set(_qm_src "${_QT_TRANSLATIONS_DIR}/${_qm}")
+            if(EXISTS "${_qm_src}")
+                string(APPEND _qrc_body
+                    "    <file alias=\"${_qm}\">${_qm_src}</file>\n")
+                set(_qrc_has_files TRUE)
+            endif()
+        endforeach()
+        string(APPEND _qrc_body "  </qresource>\n</RCC>\n")
+        if(_qrc_has_files)
+            # Two-step write so the qrc mtime only updates when content
+            # actually changes, avoiding spurious rcc reruns.
+            set(_qrc_tmp "${CMAKE_BINARY_DIR}/qt_translations.qrc.tmp")
+            set(_QT_TRANSLATIONS_QRC "${CMAKE_BINARY_DIR}/qt_translations.qrc")
+            file(WRITE "${_qrc_tmp}" "${_qrc_body}")
+            configure_file("${_qrc_tmp}" "${_QT_TRANSLATIONS_QRC}" COPYONLY)
+            message(STATUS "Embedding Qt translations from ${_QT_TRANSLATIONS_DIR} into qt_translations.qrc")
+        else()
+            message(WARNING "No qtbase_*.qm found in ${_QT_TRANSLATIONS_DIR}; mobile build will render standard buttons in English")
+        endif()
+    else()
+        message(WARNING "Qt translation prefix not discovered; mobile build will render standard buttons in English")
+    endif()
+endif()
+
+# ============================================================================
 # Resources
 # ============================================================================
 set(RESOURCES resources.qrc markdown/media.qrc)
+if(_QT_TRANSLATIONS_QRC)
+    list(APPEND RESOURCES "${_QT_TRANSLATIONS_QRC}")
+endif()
 if(USE_QT5)
     qt5_add_resources(QRCC_FILES ${RESOURCES})
 else()
@@ -1160,44 +1261,15 @@ endif()
 # ============================================================================
 # Install Targets
 # ============================================================================
-
-# Discover Qt's translation prefix once so we can ship qtbase_<lang>.qm
-# alongside our own app_<lang>.qm. These hold the QMessageBox / QFileDialog
-# standard button strings (Save / Discard / Cancel / Open / Yes / No / ...);
-# without them the loader in source/Main.cpp falls back to English even
-# when the rest of the UI is translated. Guarded so a Qt dev tree that
-# doesn't ship every catalog won't break `make install`.
-set(_QT_TRANSLATIONS_DIR "")
-if(TARGET Qt6::qmake)
-    get_target_property(_qmake_exe Qt6::qmake IMPORTED_LOCATION)
-elseif(TARGET Qt5::qmake)
-    get_target_property(_qmake_exe Qt5::qmake IMPORTED_LOCATION)
-else()
-    set(_qmake_exe "")
-endif()
-if(_qmake_exe AND EXISTS "${_qmake_exe}")
-    execute_process(
-        COMMAND "${_qmake_exe}" -query QT_INSTALL_TRANSLATIONS
-        OUTPUT_VARIABLE _QT_TRANSLATIONS_DIR
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        RESULT_VARIABLE _qmake_query_result
-        ERROR_QUIET
-    )
-    if(NOT _qmake_query_result EQUAL 0)
-        set(_QT_TRANSLATIONS_DIR "")
-    endif()
-endif()
-set(_SUPPORTED_QTBASE_QM
-    qtbase_de.qm
-    qtbase_es.qm
-    qtbase_fr.qm
-    qtbase_pt_BR.qm
-    qtbase_zh_CN.qm
-    qtbase_en.qm
-)
+# Qt's own qtbase_<lang>.qm catalogs are discovered + (on mobile) embedded
+# higher up in this file, in the "Qt translation catalogs" section above
+# the Resources block. _install_qtbase_translations() is defined there.
 
 if(IOS)
-    # iOS: No install targets — packaging is handled by ios/build-deb.sh and ios/build-speedynote.sh
+    # iOS: No install targets — packaging is handled by ios/build-deb.sh and
+    # ios/build-speedynote.sh. qtbase_*.qm reaches the device via the
+    # embedded qt_translations.qrc generated above (see "Qt translation
+    # catalogs" section).
 
 elseif(APPLE)
     install(TARGETS speedynote DESTINATION bin)
@@ -1208,14 +1280,7 @@ elseif(APPLE)
     if(RESOURCE_QM_FILES)
         install(FILES ${RESOURCE_QM_FILES} DESTINATION share/speedynote/translations)
     endif()
-    if(_QT_TRANSLATIONS_DIR)
-        foreach(_qm IN LISTS _SUPPORTED_QTBASE_QM)
-            if(EXISTS "${_QT_TRANSLATIONS_DIR}/${_qm}")
-                install(FILES "${_QT_TRANSLATIONS_DIR}/${_qm}"
-                        DESTINATION share/speedynote/translations)
-            endif()
-        endforeach()
-    endif()
+    _install_qtbase_translations(share/speedynote/translations)
     install(FILES resources/icons/mainicon.svg DESTINATION share/speedynote/icons)
 
 elseif(UNIX AND NOT ANDROID)
@@ -1227,14 +1292,7 @@ elseif(UNIX AND NOT ANDROID)
     if(RESOURCE_QM_FILES)
         install(FILES ${RESOURCE_QM_FILES} DESTINATION share/speedynote/translations)
     endif()
-    if(_QT_TRANSLATIONS_DIR)
-        foreach(_qm IN LISTS _SUPPORTED_QTBASE_QM)
-            if(EXISTS "${_QT_TRANSLATIONS_DIR}/${_qm}")
-                install(FILES "${_QT_TRANSLATIONS_DIR}/${_qm}"
-                        DESTINATION share/speedynote/translations)
-            endif()
-        endforeach()
-    endif()
+    _install_qtbase_translations(share/speedynote/translations)
     # Desktop integration files
     install(FILES data/org.speedynote.SpeedyNote.desktop
             DESTINATION share/applications)

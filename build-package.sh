@@ -179,6 +179,9 @@ copy_qt_translations() {
 
     mkdir -p "$dest_dir"
     local copied=0
+    # Keep in sync with the _SUPPORTED_QTBASE_QM list in CMakeLists.txt, the
+    # $supportedQtbase array in compile.ps1, and the inline qtbase loops in
+    # the rpm spec / Arch PKGBUILD / Alpine APKBUILD heredocs below.
     local qtbase_files=(qtbase_de.qm qtbase_es.qm qtbase_fr.qm qtbase_pt_BR.qm qtbase_zh_CN.qm qtbase_en.qm)
     for f in "${qtbase_files[@]}"; do
         if [[ -f "$qt_tr_dir/$f" ]]; then

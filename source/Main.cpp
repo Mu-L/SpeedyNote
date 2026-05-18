@@ -384,16 +384,22 @@ static void loadTranslations(QApplication& app, QTranslator& translator)
     }
     QLocale uiLocale(fullLocale);
 
-    // Common search paths for both Qt's catalogs and the app catalog. Order
-    // matters: the deployed/install layouts come first so a packaged build
-    // never accidentally picks up a translation from the build machine's
-    // Qt prefix (which is what QLibraryInfo::TranslationsPath returns).
+    // Common search paths for Qt's own catalog. Order matters:
+    //   1. Deployed/install layouts (so a packaged build never accidentally
+    //      picks up a translation from the build machine's Qt prefix).
+    //   2. ":/qt-translations" - embedded fallback populated on mobile by
+    //      CMakeLists.txt's qt_translations.qrc generation. Universal, so
+    //      desktop also benefits if the on-disk paths are unreadable for
+    //      any reason.
+    //   3. QLibraryInfo::TranslationsPath - dev convenience for running
+    //      out of the build tree against a system Qt.
     QStringList qtSearchPaths;
     qtSearchPaths
         << QCoreApplication::applicationDirPath() + "/translations"
         << QCoreApplication::applicationDirPath()
         << "/usr/share/speedynote/translations"
-        << "/usr/local/share/speedynote/translations";
+        << "/usr/local/share/speedynote/translations"
+        << QStringLiteral(":/qt-translations");
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     qtSearchPaths << QLibraryInfo::path(QLibraryInfo::TranslationsPath);
 #else
@@ -408,6 +414,11 @@ static void loadTranslations(QApplication& app, QTranslator& translator)
     // actually carries the widget strings) and fall back to `qt` for
     // dev/Qt 5 setups and for the legacy aggregated catalog that
     // windeployqt6 still ships.
+    //
+    // qtBaseTranslator is static so it survives the function return; the
+    // QApplication translator stack holds a non-owning pointer. Each load()
+    // discards the previous catalog, so repeated calls (e.g. after a
+    // hypothetical hot language switch) stay leak-free.
     static QTranslator qtBaseTranslator;
     bool qtLoaded = false;
     for (const QString& path : qtSearchPaths) {
@@ -422,10 +433,14 @@ static void loadTranslations(QApplication& app, QTranslator& translator)
 #ifdef SPEEDYNOTE_DEBUG
     qDebug() << "[i18n] Qt base translator loaded:" << qtLoaded
              << "| locale =" << uiLocale.name() << "| langCode =" << langCode;
+#else
+    Q_UNUSED(qtLoaded);
 #endif
 
     // Load SpeedyNote's translations. Same QLocale-aware overload so a user
     // whose system locale is e.g. de_AT still picks up app_de.qm.
+    // ":/resources/translations" is the universal embedded fallback baked
+    // into the binary via resources.qrc - works on every platform.
     QStringList translationPaths = {
         QCoreApplication::applicationDirPath(),
         QCoreApplication::applicationDirPath() + "/translations",
@@ -433,7 +448,7 @@ static void loadTranslations(QApplication& app, QTranslator& translator)
         "/usr/local/share/speedynote/translations",
         QStandardPaths::locate(QStandardPaths::GenericDataLocation,
                                "speedynote/translations", QStandardPaths::LocateDirectory),
-        ":/resources/translations"
+        QStringLiteral(":/resources/translations")
     };
 
     bool appLoaded = false;
@@ -448,6 +463,8 @@ static void loadTranslations(QApplication& app, QTranslator& translator)
 #ifdef SPEEDYNOTE_DEBUG
     qDebug() << "[i18n] App translator loaded:" << appLoaded
              << "| locale =" << uiLocale.name() << "| langCode =" << langCode;
+#else
+    Q_UNUSED(appLoaded);
 #endif
 }
 
