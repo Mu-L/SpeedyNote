@@ -1160,6 +1160,42 @@ endif()
 # ============================================================================
 # Install Targets
 # ============================================================================
+
+# Discover Qt's translation prefix once so we can ship qtbase_<lang>.qm
+# alongside our own app_<lang>.qm. These hold the QMessageBox / QFileDialog
+# standard button strings (Save / Discard / Cancel / Open / Yes / No / ...);
+# without them the loader in source/Main.cpp falls back to English even
+# when the rest of the UI is translated. Guarded so a Qt dev tree that
+# doesn't ship every catalog won't break `make install`.
+set(_QT_TRANSLATIONS_DIR "")
+if(TARGET Qt6::qmake)
+    get_target_property(_qmake_exe Qt6::qmake IMPORTED_LOCATION)
+elseif(TARGET Qt5::qmake)
+    get_target_property(_qmake_exe Qt5::qmake IMPORTED_LOCATION)
+else()
+    set(_qmake_exe "")
+endif()
+if(_qmake_exe AND EXISTS "${_qmake_exe}")
+    execute_process(
+        COMMAND "${_qmake_exe}" -query QT_INSTALL_TRANSLATIONS
+        OUTPUT_VARIABLE _QT_TRANSLATIONS_DIR
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE _qmake_query_result
+        ERROR_QUIET
+    )
+    if(NOT _qmake_query_result EQUAL 0)
+        set(_QT_TRANSLATIONS_DIR "")
+    endif()
+endif()
+set(_SUPPORTED_QTBASE_QM
+    qtbase_de.qm
+    qtbase_es.qm
+    qtbase_fr.qm
+    qtbase_pt_BR.qm
+    qtbase_zh_CN.qm
+    qtbase_en.qm
+)
+
 if(IOS)
     # iOS: No install targets — packaging is handled by ios/build-deb.sh and ios/build-speedynote.sh
 
@@ -1172,6 +1208,14 @@ elseif(APPLE)
     if(RESOURCE_QM_FILES)
         install(FILES ${RESOURCE_QM_FILES} DESTINATION share/speedynote/translations)
     endif()
+    if(_QT_TRANSLATIONS_DIR)
+        foreach(_qm IN LISTS _SUPPORTED_QTBASE_QM)
+            if(EXISTS "${_QT_TRANSLATIONS_DIR}/${_qm}")
+                install(FILES "${_QT_TRANSLATIONS_DIR}/${_qm}"
+                        DESTINATION share/speedynote/translations)
+            endif()
+        endforeach()
+    endif()
     install(FILES resources/icons/mainicon.svg DESTINATION share/speedynote/icons)
 
 elseif(UNIX AND NOT ANDROID)
@@ -1182,6 +1226,14 @@ elseif(UNIX AND NOT ANDROID)
     file(GLOB RESOURCE_QM_FILES "resources/translations/*.qm")
     if(RESOURCE_QM_FILES)
         install(FILES ${RESOURCE_QM_FILES} DESTINATION share/speedynote/translations)
+    endif()
+    if(_QT_TRANSLATIONS_DIR)
+        foreach(_qm IN LISTS _SUPPORTED_QTBASE_QM)
+            if(EXISTS "${_QT_TRANSLATIONS_DIR}/${_qm}")
+                install(FILES "${_QT_TRANSLATIONS_DIR}/${_qm}"
+                        DESTINATION share/speedynote/translations)
+            endif()
+        endforeach()
     endif()
     # Desktop integration files
     install(FILES data/org.speedynote.SpeedyNote.desktop

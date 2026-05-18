@@ -370,26 +370,62 @@ static void loadTranslations(QApplication& app, QTranslator& translator)
     QSettings settings("SpeedyNote", "App");
     bool useSystemLanguage = settings.value("useSystemLanguage", true).toBool();
 
+    // Preserve the full BCP-47 / region-tagged code when in system mode so the
+    // QTranslator::load(QLocale, ...) overload below can probe regional Qt
+    // catalogs (e.g. qtbase_zh_CN.qm exists; qtbase_zh.qm does not).
+    QString fullLocale;
     QString langCode;
     if (useSystemLanguage) {
-        langCode = QLocale::system().name().section('_', 0, 0);
+        fullLocale = QLocale::system().name();
+        langCode   = fullLocale.section('_', 0, 0);
     } else {
-        langCode = settings.value("languageOverride", "en").toString();
+        langCode   = settings.value("languageOverride", "en").toString();
+        fullLocale = langCode;
     }
-    
-    // Load Qt's base translations (for standard dialogs: Save, Cancel, etc.)
-    // This must be loaded before the app translator so app translations take priority
-    static QTranslator qtBaseTranslator;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    QString qtTranslationsPath = QLibraryInfo::path(QLibraryInfo::TranslationsPath);
-#else
-    QString qtTranslationsPath = QLibraryInfo::location(QLibraryInfo::TranslationsPath);
-#endif
-    if (qtBaseTranslator.load("qtbase_" + langCode, qtTranslationsPath)) {
-        app.installTranslator(&qtBaseTranslator);
-    }
+    QLocale uiLocale(fullLocale);
 
-    // Load SpeedyNote's translations
+    // Common search paths for both Qt's catalogs and the app catalog. Order
+    // matters: the deployed/install layouts come first so a packaged build
+    // never accidentally picks up a translation from the build machine's
+    // Qt prefix (which is what QLibraryInfo::TranslationsPath returns).
+    QStringList qtSearchPaths;
+    qtSearchPaths
+        << QCoreApplication::applicationDirPath() + "/translations"
+        << QCoreApplication::applicationDirPath()
+        << "/usr/share/speedynote/translations"
+        << "/usr/local/share/speedynote/translations";
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    qtSearchPaths << QLibraryInfo::path(QLibraryInfo::TranslationsPath);
+#else
+    qtSearchPaths << QLibraryInfo::location(QLibraryInfo::TranslationsPath);
+#endif
+
+    // Load Qt's base translations (Save / Discard / Cancel / Open / Yes / No
+    // and other QMessageBox / QFileDialog standard strings).
+    // QTranslator::load(QLocale, ...) probes the full regional fallback chain
+    // (e.g. qtbase_zh_CN -> qtbase_zh -> qtbase), so we don't need a manual
+    // langCode -> region map. We try `qtbase` first (the Qt 6 catalog that
+    // actually carries the widget strings) and fall back to `qt` for
+    // dev/Qt 5 setups and for the legacy aggregated catalog that
+    // windeployqt6 still ships.
+    static QTranslator qtBaseTranslator;
+    bool qtLoaded = false;
+    for (const QString& path : qtSearchPaths) {
+        if (path.isEmpty()) continue;
+        if (qtBaseTranslator.load(uiLocale, "qtbase", "_", path) ||
+            qtBaseTranslator.load(uiLocale, "qt",     "_", path)) {
+            app.installTranslator(&qtBaseTranslator);
+            qtLoaded = true;
+            break;
+        }
+    }
+#ifdef SPEEDYNOTE_DEBUG
+    qDebug() << "[i18n] Qt base translator loaded:" << qtLoaded
+             << "| locale =" << uiLocale.name() << "| langCode =" << langCode;
+#endif
+
+    // Load SpeedyNote's translations. Same QLocale-aware overload so a user
+    // whose system locale is e.g. de_AT still picks up app_de.qm.
     QStringList translationPaths = {
         QCoreApplication::applicationDirPath(),
         QCoreApplication::applicationDirPath() + "/translations",
@@ -400,12 +436,19 @@ static void loadTranslations(QApplication& app, QTranslator& translator)
         ":/resources/translations"
     };
 
+    bool appLoaded = false;
     for (const QString& path : translationPaths) {
-        if (translator.load(path + "/app_" + langCode + ".qm")) {
+        if (path.isEmpty()) continue;
+        if (translator.load(uiLocale, "app", "_", path)) {
             app.installTranslator(&translator);
+            appLoaded = true;
             break;
         }
     }
+#ifdef SPEEDYNOTE_DEBUG
+    qDebug() << "[i18n] App translator loaded:" << appLoaded
+             << "| locale =" << uiLocale.name() << "| langCode =" << langCode;
+#endif
 }
 
 // ============================================================================

@@ -278,6 +278,42 @@ if ($qt5) {
     & "$qtBinPath\windeployqt6.exe" "speedynote.exe"
 }
 
+# Ship Qt's own translation catalogs for each language the app supports.
+# windeployqt6 drops the legacy aggregated qt_<lang>.qm but NOT the Qt 6
+# qtbase_<lang>.qm that actually carries QMessageBox / QFileDialog standard
+# button strings (Save / Discard / Cancel / Open / Yes / No / ...).
+# Without these files the loader in source/Main.cpp silently falls back to
+# English even when the app catalog loads correctly.
+# Filenames match the MSYS2 Qt 6 layout: zh and pt only ship with region
+# suffixes (qtbase_zh_CN.qm, qtbase_pt_BR.qm); the QLocale-aware loader in
+# loadTranslations() probes the regional fallback chain automatically.
+$qmakeExe = if ($qt5) { "$qtBinPath\qmake.exe" } else { "$qtBinPath\qmake6.exe" }
+$qtTranslationsPath = $null
+if (Test-Path $qmakeExe) {
+    $qtTranslationsPath = (& $qmakeExe -query QT_INSTALL_TRANSLATIONS 2>$null) | Select-Object -First 1
+}
+if ($qtTranslationsPath -and (Test-Path $qtTranslationsPath)) {
+    $supportedQtbase = @(
+        'qtbase_de.qm','qtbase_es.qm','qtbase_fr.qm',
+        'qtbase_pt_BR.qm','qtbase_zh_CN.qm','qtbase_en.qm'
+    )
+    $dest = ".\translations"
+    New-Item -ItemType Directory -Path $dest -Force | Out-Null
+    $qtCopiedCount = 0
+    foreach ($f in $supportedQtbase) {
+        $src = Join-Path $qtTranslationsPath $f
+        if (Test-Path $src) {
+            Copy-Item -Path $src -Destination $dest -Force
+            $qtCopiedCount++
+        } else {
+            Write-Host "   (skip - not found in Qt prefix: $f)" -ForegroundColor DarkYellow
+        }
+    }
+    Write-Host "Copied $qtCopiedCount qtbase_*.qm translation catalog(s) from $qtTranslationsPath" -ForegroundColor Cyan
+} else {
+    Write-Host "WARNING: Qt translation prefix not found via $qmakeExe; standard dialog buttons may render in English." -ForegroundColor Yellow
+}
+
 $copiedCount = 0
 if ($win32) {
     # ✅ Standalone Qt SDK: windeployqt handles Qt DLLs; detect remaining deps recursively
