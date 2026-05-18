@@ -159,9 +159,23 @@ QVector<PdfSearchMatch> PdfSearchEngine::searchPage(int pageIndex,
                     boxMapping.append({i, j});
                 }
                 
+                // CJK-aware synthetic separator: MuPdfProvider emits one
+                // PdfTextBox per CJK glyph, so blindly inserting a space
+                // between every adjacent box pair would break multi-char
+                // CJK searches (e.g. searching "中文" against a pageText
+                // that became "中 文"). Mirrors the same predicate used by
+                // searchOcrBlocks() below.
                 if (i < textBoxes.size() - 1 && !pageText.endsWith(' ')) {
-                    pageText += ' ';
-                    boxMapping.append({-1, -1});
+                    QChar prevTrailing = textBoxes[i].text.isEmpty()
+                        ? QChar() : textBoxes[i].text.back();
+                    QChar nextLeading  = textBoxes[i + 1].text.isEmpty()
+                        ? QChar() : textBoxes[i + 1].text.front();
+                    bool needsSpace = !isCjkLikeChar(prevTrailing)
+                                   && !isCjkLikeChar(nextLeading);
+                    if (needsSpace) {
+                        pageText += ' ';
+                        boxMapping.append({-1, -1});
+                    }
                 }
             }
             
