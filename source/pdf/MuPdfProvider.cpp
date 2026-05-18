@@ -11,6 +11,11 @@
 #include <QFile>
 #include <QMutexLocker>
 
+// CJK detection shared with PdfSearchEngine / DocumentViewport / OCR engines
+// so the "one PdfTextBox per CJK glyph" rule below stays consistent with the
+// space-joining heuristics used elsewhere.
+#include "../ocr/OcrTextBlock.h"
+
 // ============================================================================
 // BUG-Q003: Shared lock context for MuPDF thread safety (Qt5/Win32)
 // ============================================================================
@@ -498,33 +503,64 @@ QVector<PdfTextBox> MuPdfProvider::textBoxes(int pageIndex) const
         fz_stext_options opts = {0};
         textPage = fz_new_stext_page_from_page(m_ctx, page, &opts);
         
-        // Iterate through text blocks
+        // Iterate through text blocks.
+        //
+        // Emission invariant (consumers rely on this):
+        //   One PdfTextBox == one whitespace-delimited Latin token
+        //                  OR one CJK glyph.
+        //   box.charBoundingBoxes.size() == box.text.length() in both cases.
+        //
+        // Why per-CJK-char boxes: CJK scripts have no spaces, so the old
+        // "flush on whitespace" loop emitted one giant box per visual line,
+        // which collapsed text selection (DocumentViewport::findCharacterAtPoint,
+        // updateSelectedTextAndRects_Pdf) and search highlights
+        // (PdfSearchEngine::searchPage match-rect union) down to line granularity.
+        // Splitting each CJK glyph into its own box restores character precision
+        // without affecting Latin word semantics (double-click word, triple-click
+        // line still work). PdfSearchEngine's synthetic-space insertion is
+        // CJK-aware so multi-char CJK searches still match across the split.
         for (fz_stext_block* block = textPage->first_block; block; block = block->next) {
             if (block->type != FZ_STEXT_BLOCK_TEXT) continue;
             
             for (fz_stext_line* line = block->u.t.first_line; line; line = line->next) {
-                // Build word from characters
+                // In-progress Latin word state. CJK glyphs are emitted
+                // inline (one box per glyph) and don't touch these.
                 QString word;
                 QRectF wordRect;
+                QVector<QRectF> wordChars;
+                
+                auto flushWord = [&]() {
+                    if (word.isEmpty()) return;
+                    PdfTextBox box;
+                    box.text = word;
+                    box.boundingBox = wordRect;
+                    box.charBoundingBoxes = wordChars;
+                    boxes.append(box);
+                    word.clear();
+                    wordRect = QRectF();
+                    wordChars.clear();
+                };
                 
                 for (fz_stext_char* ch = line->first_char; ch; ch = ch->next) {
                     // Get character rectangle
                     fz_rect r = fz_rect_from_quad(ch->quad);
                     QRectF charRect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0);
                     
-                    // Check if this is a space (word boundary)
                     QChar qch(ch->c);
-                    if (qch.isSpace() && !word.isEmpty()) {
-                        // Save current word
-                        PdfTextBox box;
-                        box.text = word;
-                        box.boundingBox = wordRect;
-                        boxes.append(box);
-                        
-                        word.clear();
-                        wordRect = QRectF();
-                    } else if (!qch.isSpace()) {
+                    if (qch.isSpace()) {
+                        flushWord();
+                    } else if (isCjkLikeChar(qch)) {
+                        // Flush any pending Latin word first so the per-glyph
+                        // CJK box appears in reading order.
+                        flushWord();
+                        PdfTextBox cjkBox;
+                        cjkBox.text = QString(qch);
+                        cjkBox.boundingBox = charRect;
+                        cjkBox.charBoundingBoxes = { charRect };
+                        boxes.append(cjkBox);
+                    } else {
                         word += qch;
+                        wordChars.append(charRect);
                         if (wordRect.isNull()) {
                             wordRect = charRect;
                         } else {
@@ -533,13 +569,8 @@ QVector<PdfTextBox> MuPdfProvider::textBoxes(int pageIndex) const
                     }
                 }
                 
-                // Save last word in line
-                if (!word.isEmpty()) {
-                    PdfTextBox box;
-                    box.text = word;
-                    box.boundingBox = wordRect;
-                    boxes.append(box);
-                }
+                // Save trailing Latin word in line (CJK already emitted inline)
+                flushWord();
             }
         }
     }

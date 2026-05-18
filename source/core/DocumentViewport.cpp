@@ -11286,7 +11286,15 @@ void DocumentViewport::updateSelectedTextAndRects_Pdf()
         // Extract text for this range
         QString boxText = box.text.mid(startChar, endChar - startChar + 1);
         if (!selectedText.isEmpty() && !boxText.isEmpty()) {
-            selectedText += " ";  // Space between words
+            // CJK-aware separator: MuPdfProvider emits one PdfTextBox per
+            // CJK glyph, so a hard-coded space would turn copied "中文"
+            // into "中 文" in the clipboard. Mirrors the same predicate used
+            // by PdfSearchEngine::searchPage and the OCR text-join below.
+            QChar prevTrailing = selectedText.at(selectedText.length() - 1);
+            QChar nextLeading  = boxText.at(0);
+            if (!isCjkLikeChar(prevTrailing) && !isCjkLikeChar(nextLeading)) {
+                selectedText += QLatin1Char(' ');
+            }
         }
         selectedText += boxText;
         
