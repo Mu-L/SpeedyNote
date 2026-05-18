@@ -7336,10 +7336,10 @@ bool MainWindow::syncDocumentPosition(Document* doc, DocumentViewport* vp)
     }
     
     if (doc->isEdgeless()) {
-        // Edgeless: sync canvas position/zoom to document
-        // Note: syncPositionToDocument() updates internal state but doesn't mark modified
-        vp->syncPositionToDocument();
-        return true;  // Position always "changes" for edgeless (can't easily detect)
+        // Edgeless: sync canvas position/zoom and report honestly whether
+        // anything actually changed. Returning false for an untouched doc
+        // lets autosavePositionOnlyChange skip a full bundle rewrite.
+        return vp->syncPositionToDocument();
     } else {
         // Paged: update lastAccessedPage if changed
         int currentPage = vp->currentPageIndex();
@@ -7375,6 +7375,10 @@ void MainWindow::autosavePositionOnlyChange(Document* doc, DocumentViewport* vp)
     // lastAccessedPage) without ever flipping doc->modified. After this
     // returns, doc->modified reflects only REAL user edits, so close-time
     // prompts (both tab-close and app-close) can use it directly.
+    //
+    // syncDocumentPosition now returns false for an untouched doc (edgeless
+    // included), so this short-circuits to zero I/O in the common "opened
+    // and closed without panning" case.
     if (!doc || !vp || !m_documentManager) {
         return;
     }
@@ -7383,6 +7387,10 @@ void MainWindow::autosavePositionOnlyChange(Document* doc, DocumentViewport* vp)
     if (positionChanged && !isUsingTemp && !doc->modified) {
         const QString existingPath = m_documentManager->documentPath(doc);
         if (!existingPath.isEmpty()) {
+#ifdef SPEEDYNOTE_DEBUG
+            qDebug() << "autosavePositionOnlyChange: persisting position for"
+                     << doc->displayName();
+#endif
             m_documentManager->saveDocument(doc);
         }
     }

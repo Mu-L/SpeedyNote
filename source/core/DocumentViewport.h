@@ -1482,7 +1482,16 @@ public slots:
      * Call before saving the document. Copies the viewport's current position
      * and history stack to the Document for JSON serialization.
      */
-    void syncPositionToDocument();
+    /**
+     * @brief Push viewport's current center position and history into the Document.
+     * @return true if either lastPosition or positionHistory actually changed,
+     *         false if the document already held identical values (no-op).
+     *
+     * Returning false lets callers (e.g. close-time autosave) skip a full
+     * bundle rewrite for documents the user opened and closed without
+     * touching. Caller is still responsible for triggering any save it wants.
+     */
+    bool syncPositionToDocument();
     
     /**
      * @brief Restore position and history from the document.

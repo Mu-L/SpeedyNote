@@ -447,15 +447,19 @@ private:
      * @brief Sync a document's viewport position to the document model.
      * @param doc The document to sync.
      * @param vp The viewport showing the document.
-     * @return true if position was updated, false if unchanged.
-     * 
+     * @return true if the document's stored position/history actually changed,
+     *         false if it was already in sync (no-op).
+     *
      * For paged documents: updates lastAccessedPage from viewport's current page.
-     * For edgeless documents: calls syncPositionToDocument() to save canvas position.
-     * 
-     * NOTE: This does NOT mark the document as modified. The caller should
-     * decide whether to mark modified based on context:
-     * - For save operations: don't mark (save will persist the position)
-     * - For auto-save/close: mark modified so the document gets saved
+     * For edgeless documents: defers to DocumentViewport::syncPositionToDocument,
+     * which compares against the doc's stored values to report an honest result.
+     *
+     * NOTE: This does NOT mark the document as modified. Callers decide:
+     * - Save operations: don't mark (the save itself persists the position).
+     * - Desktop close (tab/app): use autosavePositionOnlyChange, which silently
+     *   saves on a true return without ever flipping doc->modified.
+     * - Mobile suspend: use syncAllDocumentPositions, which markModifies on
+     *   true so autoSaveModifiedDocuments picks the doc up.
      */
     bool syncDocumentPosition(Document* doc, DocumentViewport* vp);
     
