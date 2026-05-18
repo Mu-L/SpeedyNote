@@ -79,6 +79,16 @@
 
 
   <releases type="embedded">
+    <release version="1.4.6" date="2026-05-18">
+      <description>
+        <p>Bug Fixes and Improvements:</p>
+        <ul>
+          <li>Increased the precision of the PDF text extraction so that single characters can be selected and copied.</li>
+          <li>Fixed the problem that the save document dialog was displayed when no changes were made to the document.</li>
+          <li>Fixed the problem that the Qt standard button translations were not applied.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.4.5" date="2026-05-11">
       <description>
         <p>Bug Fixes and Improvements:</p>
