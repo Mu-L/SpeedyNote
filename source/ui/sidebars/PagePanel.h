@@ -20,11 +20,13 @@ class PageThumbnailDelegate;
  * 
  * Features:
  * - QListView with custom model and delegate
- * - Touch-friendly scrolling (QScroller)
- * - Auto-scroll to current page when not visible
- * - Debounced thumbnail invalidation (500ms)
- * - Drag-and-drop reorder support
+ * - Manual touch scrolling with kinetic deceleration (see PagePanelListView)
+ * - Auto-scroll to the current page when it falls offscreen
+ * - Debounced thumbnail invalidation (INVALIDATION_DELAY_MS)
+ * - Long-press drag-and-drop reorder (PDF background pages excluded)
  * - Width-responsive thumbnail sizing
+ * - Auto 1-column / 2-column layout based on sidebar width, with
+ *   hysteresis to avoid flicker while dragging the splitter handle
  * - Per-tab scroll position state
  * 
  * Usage:
@@ -202,6 +204,16 @@ private:
     void updateThumbnailWidth();
     void applyTheme();
 
+    // Layout-mode helpers (1-column vs 2-column)
+    int chooseColumnCount(int panelWidth) const;
+    void applyLayoutMode(int columns, bool force = false);
+    // Recompute the delegate width and ensure the list view re-lays out
+    // its items. Use after structural changes that may have invalidated
+    // the QListView's internal wrap state (model resets, hidden->visible
+    // transitions), where Qt would not re-flow on its own after a
+    // delegate sizeHint change.
+    void refreshLayoutAfterStructuralChange();
+
     // Widgets
     PagePanelListView* m_listView = nullptr;
     PageThumbnailModel* m_model = nullptr;
@@ -211,6 +223,10 @@ private:
     Document* m_document = nullptr;
     int m_currentPageIndex = 0;
     bool m_darkMode = false;
+    
+    // Current layout column count (1 or 2). Hysteresis is applied so we don't
+    // flip back and forth while the user drags the splitter handle.
+    int m_currentColumns = 1;
     
     // Debounced invalidation
     QTimer* m_invalidationTimer = nullptr;
@@ -229,6 +245,12 @@ private:
     static constexpr int THUMBNAIL_PADDING = 16;  // Padding on each side
     static constexpr int INVALIDATION_DELAY_MS = 500;
     static constexpr int RESIZE_DEBOUNCE_MS = 150;
+    
+    // Two-column layout thresholds (panel width in logical pixels). The
+    // hysteresis band prevents flicker while dragging the splitter handle.
+    static constexpr int TWO_COL_ENTER_WIDTH = 340;
+    static constexpr int TWO_COL_EXIT_WIDTH  = 290;
+    static constexpr int COLUMN_GAP          = 4;
 };
 
 #endif // PAGEPANEL_H

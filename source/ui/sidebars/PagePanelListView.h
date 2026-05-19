@@ -59,7 +59,6 @@ private slots:
     void onKineticScrollTick();
 
 private:
-    void setupTouchScrolling();
     void startKineticScroll(qreal velocity);
     void stopKineticScroll();
     

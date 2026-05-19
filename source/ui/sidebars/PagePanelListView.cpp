@@ -9,9 +9,6 @@
 #include <QPainter>
 #include <QDebug>
 
-// Debug flag for touch scrolling diagnostics (set to 1 to enable)
-
-
 // ============================================================================
 // Constructor
 // ============================================================================
@@ -30,8 +27,9 @@ PagePanelListView::PagePanelListView(QWidget* parent)
     connect(&m_kineticTimer, &QTimer::timeout,
             this, &PagePanelListView::onKineticScrollTick);
     
-    // Setup manual touch scrolling (no QScroller - it causes conflicts)
-    setupTouchScrolling();
+    // Touch scrolling is implemented manually in the mouse event handlers
+    // below; we avoid QScroller because it conflicts with QListView's native
+    // handling (selection, drag-and-drop).
     
 #if SPEEDYNOTE_DEBUG
     // Monitor scroll position changes
@@ -47,16 +45,6 @@ void PagePanelListView::beginDrag(Qt::DropActions supportedActions)
 {
     // Public wrapper for protected startDrag
     startDrag(supportedActions);
-}
-
-// ============================================================================
-// Touch Scrolling Setup
-// ============================================================================
-
-void PagePanelListView::setupTouchScrolling()
-{
-    // Manual touch scrolling is implemented in the mouse event handlers.
-    // We don't use QScroller because it conflicts with QListView's native handling.
 }
 
 // ============================================================================
