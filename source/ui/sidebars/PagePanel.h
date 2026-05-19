@@ -204,7 +204,7 @@ private:
 
     // Layout-mode helpers (1-column vs 2-column)
     int chooseColumnCount(int panelWidth) const;
-    void applyLayoutMode(int columns);
+    void applyLayoutMode(int columns, bool force = false);
 
     // Widgets
     PagePanelListView* m_listView = nullptr;
