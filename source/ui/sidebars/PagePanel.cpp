@@ -93,9 +93,8 @@ void PagePanel::configureListView()
     m_listView->setFlow(QListView::TopToBottom);
     m_listView->setWrapping(false);
     m_listView->setResizeMode(QListView::Adjust);
-    // DEBUG: Disabled batched mode - was possibly causing scroll jumps
-    // m_listView->setLayoutMode(QListView::Batched);
-    // m_listView->setBatchSize(10);
+    // SinglePass (not Batched) keeps wrap calculations consistent and avoids
+    // a class of scroll jumps we hit while iterating on this panel.
     m_listView->setLayoutMode(QListView::SinglePass);
     
     // Selection
@@ -162,13 +161,11 @@ void PagePanel::setDocument(Document* doc)
     m_model->setDocument(doc);
     m_model->setCurrentPageIndex(0);
     
-    // setDocument() performs a begin/endResetModel like onPageCountChanged.
-    // Force-reapply the current layout mode so 2-column users don't get
-    // collapsed back to 1-column when switching documents in the same tab.
-    applyLayoutMode(m_currentColumns, /*force=*/true);
-    
-    // Update thumbnail width based on current size
-    updateThumbnailWidth();
+    // setDocument() performs a begin/endResetModel like onPageCountChanged,
+    // which can disrupt the QListView's internal wrap-mode bookkeeping
+    // (especially with setUniformItemSizes(false)) and silently fall back
+    // to a single column. Refresh delegate width and force a relayout.
+    refreshLayoutAfterStructuralChange();
     
     // Clear pending invalidations
     m_pendingInvalidations.clear();
@@ -211,7 +208,7 @@ void PagePanel::onCurrentPageChanged(int pageIndex)
 
 void PagePanel::scrollToCurrentPage()
 {
-    if (!m_document || m_currentPageIndex < 0) {
+    if (!m_document || !m_listView || !m_model || m_currentPageIndex < 0) {
         return;
     }
     
@@ -377,12 +374,10 @@ void PagePanel::onPageCountChanged()
     
     // After a full model reset, QListView's internal wrap-mode state can be
     // disrupted with setUniformItemSizes(false) and silently fall back to a
-    // single column. Force-reapply the current layout mode so 2-column users
-    // don't snap back to 1-column when adding/inserting/deleting a page.
-    applyLayoutMode(m_currentColumns, /*force=*/true);
-    
-    // Update thumbnail width in case layout changed
-    updateThumbnailWidth();
+    // single column. Refresh delegate width and force a relayout so
+    // 2-column users don't snap back to 1-column when adding/inserting/
+    // deleting a page.
+    refreshLayoutAfterStructuralChange();
 }
 
 // ============================================================================
@@ -494,6 +489,24 @@ void PagePanel::applyLayoutMode(int columns, bool force)
     });
 }
 
+void PagePanel::refreshLayoutAfterStructuralChange()
+{
+    // Recompute delegate width first. If the column count crosses the
+    // hysteresis threshold, updateThumbnailWidth() itself will call
+    // applyLayoutMode() which re-sets flow/wrap and runs doItemsLayout().
+    const int oldColumns = m_currentColumns;
+    updateThumbnailWidth();
+    
+    // If updateThumbnailWidth() didn't flip columns, it didn't trigger a
+    // relayout -- Qt only re-flows on widget resize, not on delegate
+    // sizeHint changes. Force the relayout here so the view picks up the
+    // refreshed delegate sizeHint and any wrap-state recovery after a
+    // model reset.
+    if (m_currentColumns == oldColumns) {
+        applyLayoutMode(m_currentColumns, /*force=*/true);
+    }
+}
+
 void PagePanel::updateThumbnailWidth()
 {
     // Use viewport width (excludes vertical scrollbar) for accurate per-column
@@ -584,19 +597,11 @@ void PagePanel::showEvent(QShowEvent* event)
     // The panel may have been resized while hidden (e.g., user widened the
     // sidebar from a different tab). In that case the delegate's sizeHint
     // and the QListView's wrap layout can be stale because the viewport
-    // width was unreliable while hidden. Refresh the width now that the
-    // viewport is properly laid out, then force a re-layout so the first
-    // visible frame uses the correct per-cell sizeHint.
-    //
-    // updateThumbnailWidth() only flips columns when the column count
-    // changes, so it cannot by itself force Qt to re-wrap when only the
-    // per-cell sizeHint changed. The force-true call below covers that
-    // case (and harmlessly re-applies flow/wrap when nothing changed).
-    updateThumbnailWidth();
-    applyLayoutMode(m_currentColumns, /*force=*/true);
-    
-    // Only scroll to current page on initial show, not every show
-    // The user's scroll position should be preserved
-    // scrollToCurrentPage();  // Disabled - was causing scroll jumps
+    // width was unreliable while hidden. Refresh delegate width and force
+    // a relayout so the first visible frame uses the correct per-cell
+    // sizeHint. applyLayoutMode() also schedules an offscreen-only
+    // scrollToCurrentPage(), which preserves the user's scroll position
+    // when the current page is already visible.
+    refreshLayoutAfterStructuralChange();
 }
 
