@@ -413,12 +413,86 @@ void PagePanel::onDragRequested(const QModelIndex& index)
 // Thumbnail Width
 // ============================================================================
 
+int PagePanel::chooseColumnCount(int panelWidth) const
+{
+    // Treat non-positive widths (hidden / not yet sized) as "keep current mode"
+    // so we don't accidentally collapse to 1-col on startup before the splitter
+    // has assigned a real size.
+    if (panelWidth <= 0) {
+        return m_currentColumns;
+    }
+    
+    if (panelWidth >= TWO_COL_ENTER_WIDTH) {
+        return 2;
+    }
+    if (panelWidth <= TWO_COL_EXIT_WIDTH) {
+        return 1;
+    }
+    // Inside the hysteresis band: keep current mode.
+    return m_currentColumns;
+}
+
+void PagePanel::applyLayoutMode(int columns)
+{
+    if (columns == m_currentColumns) {
+        return;
+    }
+    m_currentColumns = columns;
+    
+    if (columns >= 2) {
+        // Items flow left-to-right and wrap to the next row once a row is full.
+        // Combined with a per-item width hint of roughly viewport/2 this gives
+        // a clean 2-column grid while letting QListView handle the per-row
+        // height (which may vary if pages have mixed aspect ratios).
+        m_listView->setFlow(QListView::LeftToRight);
+        m_listView->setWrapping(true);
+    } else {
+        // Classic vertical list: one item per row, no wrapping.
+        m_listView->setFlow(QListView::TopToBottom);
+        m_listView->setWrapping(false);
+    }
+    
+    // Force an immediate relayout instead of waiting for the next paint.
+    m_listView->doItemsLayout();
+    
+    // After the new layout has been computed, re-center on the current page
+    // so the user doesn't get lost when columns change. Defer to the event
+    // loop so visualRect() reflects the new layout.
+    QTimer::singleShot(0, this, [this]() {
+        scrollToCurrentPage();
+    });
+}
+
 void PagePanel::updateThumbnailWidth()
 {
-    int availableWidth = width() - THUMBNAIL_PADDING * 2;
-    int thumbnailWidth = qMax(MIN_THUMBNAIL_WIDTH, availableWidth);
+    // Use viewport width (excludes vertical scrollbar) for accurate per-column
+    // sizing. Fall back to the widget width while the viewport isn't sized yet.
+    int viewportWidth = m_listView && m_listView->viewport()
+                            ? m_listView->viewport()->width()
+                            : width();
+    if (viewportWidth <= 0) {
+        viewportWidth = width();
+    }
+    
+    const int panelWidth = width();
+    const int columns = chooseColumnCount(panelWidth);
+    
+    int thumbnailWidth;
+    if (columns >= 2) {
+        const int available = viewportWidth - THUMBNAIL_PADDING * 2 - COLUMN_GAP;
+        thumbnailWidth = qMax(MIN_THUMBNAIL_WIDTH, available / 2);
+    } else {
+        const int available = viewportWidth - THUMBNAIL_PADDING * 2;
+        thumbnailWidth = qMax(MIN_THUMBNAIL_WIDTH, available);
+    }
     
     qreal dpr = devicePixelRatioF();
+    
+    // Flip layout mode first (cheap) so the delegate's sizeHint width is
+    // interpreted in the right context for Qt's wrap calculation.
+    if (columns != m_currentColumns) {
+        applyLayoutMode(columns);
+    }
     
     // Update delegate immediately so layout stays responsive
     m_delegate->setThumbnailWidth(thumbnailWidth);

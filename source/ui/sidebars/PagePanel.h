@@ -202,6 +202,10 @@ private:
     void updateThumbnailWidth();
     void applyTheme();
 
+    // Layout-mode helpers (1-column vs 2-column)
+    int chooseColumnCount(int panelWidth) const;
+    void applyLayoutMode(int columns);
+
     // Widgets
     PagePanelListView* m_listView = nullptr;
     PageThumbnailModel* m_model = nullptr;
@@ -211,6 +215,10 @@ private:
     Document* m_document = nullptr;
     int m_currentPageIndex = 0;
     bool m_darkMode = false;
+    
+    // Current layout column count (1 or 2). Hysteresis is applied so we don't
+    // flip back and forth while the user drags the splitter handle.
+    int m_currentColumns = 1;
     
     // Debounced invalidation
     QTimer* m_invalidationTimer = nullptr;
@@ -229,6 +237,12 @@ private:
     static constexpr int THUMBNAIL_PADDING = 16;  // Padding on each side
     static constexpr int INVALIDATION_DELAY_MS = 500;
     static constexpr int RESIZE_DEBOUNCE_MS = 150;
+    
+    // Two-column layout thresholds (panel width in logical pixels). The
+    // hysteresis band prevents flicker while dragging the splitter handle.
+    static constexpr int TWO_COL_ENTER_WIDTH = 340;
+    static constexpr int TWO_COL_EXIT_WIDTH  = 290;
+    static constexpr int COLUMN_GAP          = 4;
 };
 
 #endif // PAGEPANEL_H
