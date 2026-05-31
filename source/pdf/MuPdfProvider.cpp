@@ -324,10 +324,20 @@ QImage MuPdfProvider::renderPageToImage(int pageIndex, qreal dpi) const
         fz_rect bounds = fz_bound_page(m_ctx, page);
         fz_irect bbox = fz_round_rect(fz_transform_rect(bounds, ctm));
         
-        // Sanity check for bounds
-        int imgWidth = bbox.x1 - bbox.x0;
-        int imgHeight = bbox.y1 - bbox.y0;
-        if (imgWidth <= 0 || imgHeight <= 0 || imgWidth > 10000 || imgHeight > 10000) {
+        // Bounds guard. Render DPI is already capped upstream (effectivePdfDpi()
+        // caps at 300 DPI), so a full-page render is inherently memory-bounded by
+        // the page's physical size. We only reject degenerate bounds and
+        // genuinely pathological (poster-sized) pages here. The previous per-axis
+        // 10000 px limit wrongly blanked tall/narrow pages (e.g. 2112 x 10328) at
+        // >120% zoom; we keep full resolution so clarity is preserved.
+        const int imgWidth  = bbox.x1 - bbox.x0;
+        const int imgHeight = bbox.y1 - bbox.y0;
+        constexpr int    kMaxAxis   = 30000;                  // raster-backend safe
+        constexpr qint64 kMaxPixels = 64LL * 1024 * 1024;     // ~64 MP (~256 MB BGRA)
+        const qint64 totalPixels = qint64(imgWidth) * qint64(imgHeight);
+        if (imgWidth <= 0 || imgHeight <= 0 ||
+            imgWidth > kMaxAxis || imgHeight > kMaxAxis ||
+            totalPixels > kMaxPixels) {
             qWarning() << "MuPdfProvider: Invalid page bounds" << imgWidth << "x" << imgHeight;
             fz_throw(m_ctx, FZ_ERROR_GENERIC, "Invalid page bounds");
         }
