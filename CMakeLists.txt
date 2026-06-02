@@ -13,6 +13,7 @@ option(ENABLE_DEBUG_OUTPUT "Enable verbose debug output (qDebug prints)" OFF)
 option(ENABLE_SANITIZERS "Enable AddressSanitizer + LeakSanitizer for memory debugging" OFF)
 option(SPEEDYNOTE_ENABLE_WINDOWS_INK_OCR "Enable Windows Ink handwriting recognition (requires Windows 10 1703+)" OFF)
 option(SPEEDYNOTE_ENABLE_MLKIT_INK_OCR "Enable ML Kit Digital Ink OCR (Android/iOS)" OFF)
+option(SPEEDYNOTE_ENABLE_VISION_OCR "Enable Apple Vision OCR (macOS)" OFF)
 
 message(STATUS "Controller support: ${ENABLE_CONTROLLER_SUPPORT}")
 if(ENABLE_DEBUG_OUTPUT)
@@ -61,6 +62,20 @@ endif()
 if(ANDROID OR IOS)
     set(SPEEDYNOTE_ENABLE_MLKIT_INK_OCR ON CACHE BOOL "" FORCE)
     message(STATUS "ML Kit Digital Ink OCR: ENABLED (${CMAKE_SYSTEM_NAME})")
+endif()
+
+# Auto-enable Apple Vision OCR on macOS desktop (APPLE is true for iOS too,
+# so the explicit "AND NOT IOS" guard is required).
+if(APPLE AND NOT IOS)
+    set(SPEEDYNOTE_ENABLE_VISION_OCR ON CACHE BOOL "" FORCE)
+    message(STATUS "Apple Vision OCR: ENABLED")
+endif()
+
+# The Vision bridge is Objective-C++ (.mm). macOS desktop builds otherwise use
+# only C/C++, so OBJCXX must be enabled explicitly (the iOS branch does the same
+# for the ML Kit bridge).
+if(SPEEDYNOTE_ENABLE_VISION_OCR)
+    enable_language(OBJCXX)
 endif()
 
 if(WIN32)
@@ -802,6 +817,12 @@ if(SPEEDYNOTE_ENABLE_MLKIT_INK_OCR)
             PROPERTIES LANGUAGE OBJCXX)
     endif()
 endif()
+if(SPEEDYNOTE_ENABLE_VISION_OCR)
+    # Apple Vision backend (macOS); shares the 4A RasterOcrEngine base above.
+    list(APPEND OCR_SOURCES source/ocr/engines/VisionOcrEngine_macos.mm)
+    set_source_files_properties(source/ocr/engines/VisionOcrEngine_macos.mm
+        PROPERTIES LANGUAGE OBJCXX)
+endif()
 
 # UI components
 set(UI_SOURCES
@@ -1235,6 +1256,12 @@ elseif(APPLE)
         message(STATUS "Linking MuPDF for PDF rendering and export")
     else()
         message(FATAL_ERROR "MuPDF is required for PDF support on macOS. Install with: brew install mupdf")
+    endif()
+    if(SPEEDYNOTE_ENABLE_VISION_OCR)
+        target_compile_definitions(speedynote PRIVATE SPEEDYNOTE_HAS_VISION_OCR)
+        list(APPEND PLATFORM_LIBS
+            "-framework Vision" "-framework CoreGraphics" "-framework Foundation")
+        message(STATUS "Apple Vision OCR: linking Vision/CoreGraphics/Foundation")
     endif()
     target_link_libraries(speedynote ${PLATFORM_LIBS})
 
