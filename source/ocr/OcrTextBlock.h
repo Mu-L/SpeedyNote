@@ -55,6 +55,10 @@ struct OcrTextBlock {
     struct WordSegment {
         QString text;
         QRectF boundingRect;
+        // Optional per-character geometry. When populated, the invariant
+        // charBoundingBoxes.size() == text.length() holds (mirrors PdfTextBox).
+        // Empty when unavailable; consumers fall back to boundingRect.
+        QVector<QRectF> charBoundingBoxes;
     };
     QVector<WordSegment> wordSegments;
 
@@ -98,6 +102,19 @@ struct OcrTextBlock {
                 r.append(seg.boundingRect.width());
                 r.append(seg.boundingRect.height());
                 w["r"] = r;
+                // Optional per-character quads; only written when present.
+                if (!seg.charBoundingBoxes.isEmpty()) {
+                    QJsonArray chars;
+                    for (const auto& cb : seg.charBoundingBoxes) {
+                        QJsonArray cr;
+                        cr.append(cb.x());
+                        cr.append(cb.y());
+                        cr.append(cb.width());
+                        cr.append(cb.height());
+                        chars.append(cr);
+                    }
+                    w["c"] = chars;
+                }
                 words.append(w);
             }
             obj["words"] = words;
@@ -130,6 +147,12 @@ struct OcrTextBlock {
             if (r.size() == 4)
                 seg.boundingRect = QRectF(r[0].toDouble(), r[1].toDouble(),
                                           r[2].toDouble(), r[3].toDouble());
+            for (const auto& cval : w["c"].toArray()) {
+                QJsonArray cr = cval.toArray();
+                if (cr.size() == 4)
+                    seg.charBoundingBoxes.append(QRectF(cr[0].toDouble(), cr[1].toDouble(),
+                                                        cr[2].toDouble(), cr[3].toDouble()));
+            }
             block.wordSegments.append(seg);
         }
         return block;

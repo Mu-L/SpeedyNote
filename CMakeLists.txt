@@ -778,6 +778,14 @@ set(OCR_SOURCES
     source/ocr/OcrEngine.cpp
     source/ocr/OcrWorker.cpp
 )
+# Platform-agnostic raster OCR pipeline (Phase 4A). Pure Qt; shared base for
+# the desktop image-OCR backends (macOS Vision, Linux PaddleOCR/ONNX). No
+# backend/option needed yet -- createBest() is unchanged until 4B/4C.
+if(NOT ANDROID AND NOT IOS)
+    list(APPEND OCR_SOURCES
+        source/ocr/OcrStrokeRasterizer.cpp
+        source/ocr/engines/RasterOcrEngine.cpp)
+endif()
 if(SPEEDYNOTE_ENABLE_WINDOWS_INK_OCR)
     list(APPEND OCR_SOURCES source/ocr/engines/WindowsInkOcrEngine.cpp)
     # C++/WinRT headers require C++20 for coroutine support

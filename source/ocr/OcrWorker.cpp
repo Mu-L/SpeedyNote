@@ -320,6 +320,7 @@ QVector<OcrTextBlock> OcrWorker::buildBlocks(const QVector<OcrEngine::Result>& r
             OcrTextBlock::WordSegment seg;
             seg.text = ws.text;
             seg.boundingRect = ws.boundingRect;
+            seg.charBoundingBoxes = ws.charBoundingBoxes;
             block.wordSegments.append(seg);
         }
         blocks.append(block);

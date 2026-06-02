@@ -54,6 +54,7 @@ dmg_temp/
 
 out/
 build/
+build-debug/
 dllpack/
 poppler-24.08.0/
 share/

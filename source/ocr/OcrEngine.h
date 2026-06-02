@@ -44,6 +44,11 @@ public:
         struct WordSegment {
             QString text;
             QRectF boundingRect;
+            // Optional per-character geometry. When populated, the invariant
+            // charBoundingBoxes.size() == text.length() holds (mirrors
+            // PdfTextBox). Empty when the engine cannot provide char geometry;
+            // consumers then fall back to boundingRect.
+            QVector<QRectF> charBoundingBoxes;
         };
         QVector<WordSegment> wordSegments;
     };
