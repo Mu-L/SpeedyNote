@@ -55,24 +55,25 @@ VisionOcrEngine::recognizeImage(const QImage& strip, const QString& languageTag)
         return out;
 
     @autoreleasepool {
-        // 1. Normalized strip (dark-on-white) -> CGImage. Expand to RGBA8888
-        //    (Vision is happiest with a standard 32-bit RGB image). The
-        //    convertToFormat copy is kept alive until performRequests: returns
-        //    (synchronous), so the data provider never dangles.
-        const QImage img = strip.convertToFormat(QImage::Format_RGBA8888);
+        // 1. Normalized strip (single-channel, dark-on-white) -> grayscale
+        //    CGImage. This matches the rasterizer's output exactly: no channel
+        //    expansion, half the memory of RGBA, and no alpha/byte-order
+        //    ambiguity. The convertToFormat copy is kept alive until
+        //    performRequests: returns (synchronous), so the data provider never
+        //    dangles.
+        const QImage img = strip.convertToFormat(QImage::Format_Grayscale8);
         const int W = img.width();
         const int H = img.height();
         if (W <= 0 || H <= 0)
             return out;
 
-        CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+        CGColorSpaceRef cs = CGColorSpaceCreateDeviceGray();
         CGDataProviderRef provider = CGDataProviderCreateWithData(
             nullptr, img.bits(), static_cast<size_t>(img.sizeInBytes()), nullptr);
         CGImageRef cg = CGImageCreate(
-            static_cast<size_t>(W), static_cast<size_t>(H), 8, 32,
+            static_cast<size_t>(W), static_cast<size_t>(H), 8, 8,
             static_cast<size_t>(img.bytesPerLine()), cs,
-            kCGImageAlphaPremultipliedLast | kCGBitmapByteOrderDefault,
-            provider, nullptr, false, kCGRenderingIntentDefault);
+            kCGImageAlphaNone, provider, nullptr, false, kCGRenderingIntentDefault);
         CGDataProviderRelease(provider);
         CGColorSpaceRelease(cs);
         if (!cg)
