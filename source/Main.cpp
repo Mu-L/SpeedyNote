@@ -277,6 +277,9 @@ static void applyAndroidFonts(QApplication& app)
 #ifdef SPEEDYNOTE_HAS_VISION_OCR
 #include "ocr/OcrVisionTests.h"
 #endif
+#ifdef SPEEDYNOTE_HAS_PADDLE_OCR
+#include "ocr/OcrPaddleTests.h"
+#endif
 #endif
 
 // ============================================================================
@@ -621,6 +624,10 @@ static int runTests(const QString& testType)
     } else if (testType == "ocr-vision") {
         success = OcrVisionTests::runAllTests();
 #endif
+#ifdef SPEEDYNOTE_HAS_PADDLE_OCR
+    } else if (testType == "ocr-paddle") {
+        success = OcrPaddleTests::runAllTests();
+#endif
     } else if (testType == "buttons") {
         return QTest::qExec(new ToolbarButtonTests());
     }
@@ -953,6 +960,8 @@ int main(int argc, char* argv[])
             testToRun = "ocr-raster";
         } else if (arg == "--test-ocr-vision") {
             testToRun = "ocr-vision";
+        } else if (arg == "--test-ocr-paddle") {
+            testToRun = "ocr-paddle";
         }
 #endif
         else if (!arg.startsWith("--") && inputFile.isEmpty()) {

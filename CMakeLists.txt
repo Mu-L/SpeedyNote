@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+﻿cmake_minimum_required(VERSION 3.16)
 cmake_policy(SET CMP0074 NEW)
 
 project(SpeedyNote VERSION 1.4.6 LANGUAGES C CXX)
@@ -14,6 +14,7 @@ option(ENABLE_SANITIZERS "Enable AddressSanitizer + LeakSanitizer for memory deb
 option(SPEEDYNOTE_ENABLE_WINDOWS_INK_OCR "Enable Windows Ink handwriting recognition (requires Windows 10 1703+)" OFF)
 option(SPEEDYNOTE_ENABLE_MLKIT_INK_OCR "Enable ML Kit Digital Ink OCR (Android/iOS)" OFF)
 option(SPEEDYNOTE_ENABLE_VISION_OCR "Enable Apple Vision OCR (macOS)" OFF)
+option(SPEEDYNOTE_ENABLE_PADDLE_OCR "Enable PaddleOCR raster OCR (Linux, via vendored ONNX Runtime)" OFF)
 
 message(STATUS "Controller support: ${ENABLE_CONTROLLER_SUPPORT}")
 if(ENABLE_DEBUG_OUTPUT)
@@ -76,6 +77,27 @@ endif()
 # for the ML Kit bridge).
 if(SPEEDYNOTE_ENABLE_VISION_OCR)
     enable_language(OBJCXX)
+endif()
+
+# Auto-enable PaddleOCR raster OCR on Linux desktop, but only when the vendored
+# ONNX Runtime AND the mandatory default recognition model are both present
+# (mirrors the iOS ML Kit auto-disable pattern: graceful, no hard failure).
+# Populate them with linux/fetch-onnxruntime.sh + linux/fetch-ocr-models.sh.
+if(UNIX AND NOT APPLE AND NOT ANDROID)
+    set(ONNXRUNTIME_ROOT "${CMAKE_SOURCE_DIR}/linux/onnxruntime-build")
+    file(GLOB _ort_libs "${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so*")
+    if(_ort_libs
+       AND EXISTS "${ONNXRUNTIME_ROOT}/include/onnxruntime_cxx_api.h"
+       AND EXISTS "${CMAKE_SOURCE_DIR}/linux/ocr-models/latin_rec.onnx")
+        set(SPEEDYNOTE_ENABLE_PADDLE_OCR ON CACHE BOOL "" FORCE)
+        message(STATUS "PaddleOCR raster OCR: ENABLED (ONNX Runtime + models found)")
+    else()
+        set(SPEEDYNOTE_ENABLE_PADDLE_OCR OFF CACHE BOOL "" FORCE)
+        message(WARNING "PaddleOCR raster OCR: DISABLED -- vendored ONNX Runtime or "
+                        "default model not found under linux/. OCR will be unavailable "
+                        "on Linux. Run linux/fetch-onnxruntime.sh and "
+                        "linux/fetch-ocr-models.sh, then reconfigure.")
+    endif()
 endif()
 
 if(WIN32)
@@ -823,6 +845,11 @@ if(SPEEDYNOTE_ENABLE_VISION_OCR)
     set_source_files_properties(source/ocr/engines/VisionOcrEngine_macos.mm
         PROPERTIES LANGUAGE OBJCXX)
 endif()
+if(SPEEDYNOTE_ENABLE_PADDLE_OCR)
+    # PaddleOCR backend (Linux); shares the 4A RasterOcrEngine base above.
+    # Plain C++ (no OBJCXX); links the vendored ONNX Runtime in the UNIX block.
+    list(APPEND OCR_SOURCES source/ocr/engines/PaddleOcrEngine_linux.cpp)
+endif()
 
 # UI components
 set(UI_SOURCES
@@ -1290,6 +1317,23 @@ elseif(UNIX)
     if(ENABLE_CONTROLLER_SUPPORT)
         list(APPEND PLATFORM_LIBS PkgConfig::SDL2)
     endif()
+    # PaddleOCR raster OCR: vendored ONNX Runtime (CPU EP). ONNXRUNTIME_ROOT was
+    # set during the configure-time gating above.
+    if(SPEEDYNOTE_ENABLE_PADDLE_OCR)
+        target_compile_definitions(speedynote PRIVATE SPEEDYNOTE_HAS_PADDLE_OCR)
+        target_include_directories(speedynote PRIVATE "${ONNXRUNTIME_ROOT}/include")
+        file(GLOB _ort_so "${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so")
+        if(NOT _ort_so)
+            file(GLOB _ort_so "${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so.*")
+        endif()
+        list(GET _ort_so 0 ONNXRUNTIME_LIB)
+        list(APPEND PLATFORM_LIBS "${ONNXRUNTIME_LIB}")
+        # Resolve the bundled .so next to the install (lib/) at runtime.
+        set_target_properties(speedynote PROPERTIES
+            INSTALL_RPATH "$ORIGIN/../lib"
+            BUILD_WITH_INSTALL_RPATH FALSE)
+        message(STATUS "PaddleOCR raster OCR: linking ${ONNXRUNTIME_LIB}")
+    endif()
     target_link_libraries(speedynote ${PLATFORM_LIBS})
 endif()
 
@@ -1336,4 +1380,16 @@ elseif(UNIX AND NOT ANDROID)
     install(FILES resources/icons/mainicon.svg
             DESTINATION share/icons/hicolor/scalable/apps
             RENAME org.speedynote.SpeedyNote.svg)
+    # PaddleOCR raster OCR: bundle the recognition models + the vendored ONNX
+    # Runtime shared library alongside the install (resolved via INSTALL_RPATH).
+    if(SPEEDYNOTE_ENABLE_PADDLE_OCR)
+        file(GLOB OCR_MODEL_FILES "${CMAKE_SOURCE_DIR}/linux/ocr-models/*.onnx")
+        if(OCR_MODEL_FILES)
+            install(FILES ${OCR_MODEL_FILES} DESTINATION share/speedynote/ocr-models)
+        endif()
+        file(GLOB ONNXRUNTIME_SO_FILES "${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so*")
+        if(ONNXRUNTIME_SO_FILES)
+            install(FILES ${ONNXRUNTIME_SO_FILES} DESTINATION lib)
+        endif()
+    endif()
 endif()

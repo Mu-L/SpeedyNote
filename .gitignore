@@ -55,6 +55,8 @@ dmg_temp/
 out/
 build/
 build-debug/
+linux/ocr-models/
+linux/onnxruntime-build/
 dllpack/
 poppler-24.08.0/
 share/
