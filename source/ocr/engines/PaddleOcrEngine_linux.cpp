@@ -103,23 +103,32 @@ PaddleOcrEngine::PaddleOcrEngine()
 
 PaddleOcrEngine::~PaddleOcrEngine() = default;
 
-QString PaddleOcrEngine::modelsDir()
+QString PaddleOcrEngine::resolvedModelsDir() const
 {
+    // Cache the first directory that contains the mandatory default model.
+    // Only a successful resolution is cached, so a later on-demand model
+    // download (Phase 4D) into a not-yet-existing dir is still picked up.
+    if (!m_modelsDir.isEmpty())
+        return m_modelsDir;
+
     const QString appDir = QCoreApplication::applicationDirPath();
-    QStringList candidates;
-    candidates << appDir + QStringLiteral("/ocr-models");
-    candidates << appDir + QStringLiteral("/../share/speedynote/ocr-models");
-    candidates << QStringLiteral("/usr/share/speedynote/ocr-models");
-    candidates << QStringLiteral("/usr/local/share/speedynote/ocr-models");
-    // Dev tree: linux/ocr-models relative to the build output.
-    candidates << appDir + QStringLiteral("/../linux/ocr-models");
-    candidates << appDir + QStringLiteral("/../../linux/ocr-models");
+    const QStringList candidates = {
+        appDir + QStringLiteral("/ocr-models"),
+        appDir + QStringLiteral("/../share/speedynote/ocr-models"),
+        QStringLiteral("/usr/share/speedynote/ocr-models"),
+        QStringLiteral("/usr/local/share/speedynote/ocr-models"),
+        // Dev tree: linux/ocr-models relative to the build output.
+        appDir + QStringLiteral("/../linux/ocr-models"),
+        appDir + QStringLiteral("/../../linux/ocr-models"),
+    };
 
     for (const QString& dir : candidates) {
-        if (QFileInfo::exists(dir + QStringLiteral("/latin_rec.onnx")))
-            return QDir(dir).absolutePath();
+        if (QFileInfo::exists(dir + QStringLiteral("/latin_rec.onnx"))) {
+            m_modelsDir = QDir(dir).absolutePath();
+            break;
+        }
     }
-    return QString();
+    return m_modelsDir;
 }
 
 QString PaddleOcrEngine::modelFileForLanguage(const QString& languageTag)
@@ -136,12 +145,12 @@ bool PaddleOcrEngine::isAvailable() const
 {
     // The vendored ONNX Runtime is link-time guaranteed when this TU is built;
     // availability hinges on the mandatory default (latin) model existing.
-    return !modelsDir().isEmpty();
+    return !resolvedModelsDir().isEmpty();
 }
 
 QStringList PaddleOcrEngine::availableLanguages() const
 {
-    const QString dir = modelsDir();
+    const QString dir = resolvedModelsDir();
     if (dir.isEmpty())
         return {};
 
@@ -157,7 +166,7 @@ QStringList PaddleOcrEngine::availableLanguages() const
 
 PaddleOcrEngine::Model* PaddleOcrEngine::modelForLanguage(const QString& languageTag)
 {
-    const QString dir = modelsDir();
+    const QString dir = resolvedModelsDir();
     if (dir.isEmpty())
         return nullptr;
 
@@ -248,8 +257,10 @@ PaddleOcrEngine::recognizeImage(const QImage& strip, const QString& languageTag)
     }
 
     // --- 2. Run inference. --------------------------------------------------
-    std::vector<float> logits;
-    int T = 0, C = 0;
+    // Keep the output Ort::Value alive past the try so the CTC decoder can read
+    // its logits in place -- copying the whole [T x C] buffer out would cost
+    // tens of MB for wide lines with the large (C ~= 18k) CJK dictionary.
+    std::vector<Ort::Value> outputs;
     try {
         Ort::MemoryInfo memInfo =
             Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
@@ -259,27 +270,25 @@ PaddleOcrEngine::recognizeImage(const QImage& strip, const QString& languageTag)
 
         const char* inNames[]  = {model->inputName.c_str()};
         const char* outNames[] = {model->outputName.c_str()};
-        auto outputs = model->session.Run(Ort::RunOptions{nullptr},
-                                          inNames, &inputTensor, 1, outNames, 1);
-        if (outputs.empty())
-            return out;
-
-        const std::vector<int64_t> oShape =
-            outputs[0].GetTensorTypeAndShapeInfo().GetShape();
-        if (oShape.size() != 3)
-            return out; // expect [1, T, C]
-        T = static_cast<int>(oShape[1]);
-        C = static_cast<int>(oShape[2]);
-        if (T <= 0 || C <= 0)
-            return out;
-
-        const float* data = outputs[0].GetTensorData<float>();
-        logits.assign(data, data + static_cast<size_t>(T) * C);
+        outputs = model->session.Run(Ort::RunOptions{nullptr},
+                                     inNames, &inputTensor, 1, outNames, 1);
     } catch (const Ort::Exception&) {
         return out;
     } catch (...) {
         return out;
     }
+
+    if (outputs.empty())
+        return out;
+    const std::vector<int64_t> oShape =
+        outputs[0].GetTensorTypeAndShapeInfo().GetShape();
+    if (oShape.size() != 3)
+        return out; // expect [1, T, C]
+    const int T = static_cast<int>(oShape[1]);
+    const int C = static_cast<int>(oShape[2]);
+    if (T <= 0 || C <= 0)
+        return out;
+    const float* logits = outputs[0].GetTensorData<float>();
 
     // --- 3. Greedy CTC decode + per-char column. ----------------------------
     // Keep a token iff (it differs from the previous raw token) AND (not blank,
@@ -290,7 +299,7 @@ PaddleOcrEngine::recognizeImage(const QImage& strip, const QString& languageTag)
 
     int prevRaw = -1;
     for (int t = 0; t < T; ++t) {
-        const float* p = logits.data() + static_cast<size_t>(t) * C;
+        const float* p = logits + static_cast<size_t>(t) * C;
         int best = 0;
         float bestVal = p[0];
         for (int c = 1; c < C; ++c) {

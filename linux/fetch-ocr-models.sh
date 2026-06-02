@@ -47,6 +47,11 @@ command -v sha256sum>/dev/null 2>&1 || { echo -e "${RED}Error: sha256sum not fou
 
 mkdir -p "${OUTPUT_DIR}"
 
+# Clean up the in-flight download if any step aborts (set -e / failed mirror).
+# A successful mv leaves nothing behind, so this is a no-op on the happy path.
+tmp=""
+trap 'rm -f "${tmp:-}"' EXIT
+
 verify() { # path expected_sha
     local got
     got="$(sha256sum "$1" | awk '{print $1}')"

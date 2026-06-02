@@ -58,13 +58,15 @@ private:
     Model* modelForLanguage(const QString& languageTag);
 
     /// Absolute path to the bundled models directory, or empty if none found.
-    static QString modelsDir();
+    /// Memoized once resolved (the install layout does not change at runtime).
+    QString resolvedModelsDir() const;
     /// Map a BCP-47-ish language tag to a bundled model file name.
     static QString modelFileForLanguage(const QString& languageTag);
 
     std::unique_ptr<Impl> m_impl;                        ///< shared Ort::Env
     std::map<QString, std::unique_ptr<Model>> m_models;  ///< key = model file name
                                                          ///< (std::map: move-only values OK)
+    mutable QString m_modelsDir;                         ///< cached resolvedModelsDir()
 };
 
 #endif // SPEEDYNOTE_HAS_PADDLE_OCR
