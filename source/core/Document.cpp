@@ -3673,7 +3673,6 @@ void Document::materializeOcrTextObjects(Page* page) const
     bool isGrid = (page->backgroundType == Page::BackgroundType::Grid);
     bool isLines = (page->backgroundType == Page::BackgroundType::Lines);
     bool pageSnap = ocrSnapToBackground && (isGrid || isLines);
-    int snapSpacing = isGrid ? page->gridSpacing : page->lineSpacing;
     bool pageCjk = false;
     if (pageSnap && isGrid) {
         QSettings settings("SpeedyNote", "App");
@@ -3688,6 +3687,9 @@ void Document::materializeOcrTextObjects(Page* page) const
                 || lang.startsWith(QLatin1String("ko"), Qt::CaseInsensitive);
         }
     }
+    // Grid spacing only drives the CJK grid-cell overlay; non-CJK uses line
+    // spacing regardless of background (matches OcrWorker line snapping).
+    int snapSpacing = pageCjk ? page->gridSpacing : page->lineSpacing;
 
     for (const auto& block : page->ocrTextBlocks) {
         if (block.dirty || block.text.isEmpty())
