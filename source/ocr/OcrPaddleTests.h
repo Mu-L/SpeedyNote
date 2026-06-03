@@ -33,7 +33,45 @@ public:
     {
         return recognizeImage(strip, lang);
     }
+    static QString mapLanguage(const QString& tag)
+    {
+        return modelFileForLanguage(tag);
+    }
 };
+
+// Pure-function test: language tag -> script model file. No I/O or models, so
+// this runs even when the vendored runtime / models are absent (Phase 4D).
+inline bool testLanguageMapping()
+{
+    qDebug() << "=== Test: Language -> Model Mapping (4D) ===";
+    struct Case { const char* tag; const char* file; };
+    const Case cases[] = {
+        {"en-US", "latin_rec.onnx"},
+        {"fr-FR", "latin_rec.onnx"},
+        {"de-DE", "latin_rec.onnx"},
+        {"zh-CN", "ch_rec.onnx"},
+        {"ja-JP", "ch_rec.onnx"},
+        {"ko-KR", "korean_rec.onnx"},
+        {"ru-RU", "cyrillic_rec.onnx"},
+        {"uk-UA", "cyrillic_rec.onnx"},
+        {"ar-SA", "arabic_rec.onnx"},
+        {"fa-IR", "arabic_rec.onnx"},
+        {"hi-IN", "devanagari_rec.onnx"},
+        {"mr-IN", "devanagari_rec.onnx"},
+        {"xx-YY", "latin_rec.onnx"}, // unknown -> default latin
+    };
+    bool ok = true;
+    for (const auto& c : cases) {
+        const QString got = PaddleTestAccess::mapLanguage(QString::fromUtf8(c.tag));
+        const bool pass = (got == QString::fromUtf8(c.file));
+        if (!pass) {
+            ok = false;
+            qDebug() << "  FAIL:" << c.tag << "->" << got << "expected" << c.file;
+        }
+    }
+    qDebug() << (ok ? "PASS" : "FAIL") << "- language mapping";
+    return ok;
+}
 
 inline QImage renderTypedStrip(const QString& text, int width, int height)
 {
@@ -55,16 +93,19 @@ inline QImage renderTypedStrip(const QString& text, int width, int height)
 inline bool runAllTests()
 {
     qDebug() << "\n========================================";
-    qDebug() << "Running OCR PaddleOCR Tests (Phase 4B)";
+    qDebug() << "Running OCR PaddleOCR Tests (Phase 4B/4D)";
     qDebug() << "========================================\n";
+
+    // Pure-function checks first: these run regardless of model availability.
+    bool mappingOk = testLanguageMapping();
 
     PaddleTestAccess engine;
 
     if (!engine.isAvailable()) {
-        qDebug() << "SKIP: PaddleOCR unavailable (vendored ONNX Runtime / models "
+        qDebug() << "SKIP: PaddleOCR recognition (vendored ONNX Runtime / models "
                     "not found). Run linux/fetch-onnxruntime.sh + "
                     "linux/fetch-ocr-models.sh.";
-        return true;
+        return mappingOk;
     }
 
     qDebug() << "Available languages:" << engine.availableLanguages();
@@ -114,6 +155,8 @@ inline bool runAllTests()
             }
         }
     }
+
+    ok = ok && mappingOk;
 
     qDebug() << "\n========================================";
     qDebug() << (ok ? "ALL TESTS PASSED!" : "SOME TESTS FAILED!");

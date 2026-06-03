@@ -64,14 +64,23 @@ public slots:
 signals:
     void engineReady(bool available);
     void languagesAvailable(const QStringList& languages);
+    /// Subset of languagesAvailable() whose model is already present locally.
+    /// Re-emitted after scans so the UI can refresh "needs download" hints
+    /// without an app restart.
+    void downloadedLanguagesAvailable(const QStringList& languages);
     void resultsReady(const QString& pageId,
                       const QVector<OcrTextBlock>& blocks);
     void batchProgress(int completed, int total);
     void batchFinished(int pagesScanned, int pagesWithText);
     void error(const QString& pageId, const QString& message);
+    /// User-facing status from the engine (e.g. on-demand model download).
+    /// Emitted on the worker thread; connect queued to update the UI.
+    void statusMessage(const QString& message);
 
 private:
     QVector<OcrTextBlock> buildBlocks(const QVector<OcrEngine::Result>& results);
+    /// Emit the current downloaded-languages set (no-op without an engine).
+    void emitDownloadedLanguages();
 
     std::unique_ptr<OcrEngine> m_engine;
     std::atomic<bool> m_cancelled{false};

@@ -2043,9 +2043,22 @@ void ControlPanelDialog::createLanguageTab() {
     ocrLanguageCombo = new QComboBox(languageTab);
     ocrLanguageCombo->addItem(tr("Auto-detect (system default)"), QString());
     if (mainWindowRef) {
-        QStringList langs = mainWindowRef->ocrAvailableLanguages();
-        for (const auto& lang : langs)
-            ocrLanguageCombo->addItem(lang, lang);
+        const QStringList langs = mainWindowRef->ocrAvailableLanguages();
+        const QStringList downloaded = mainWindowRef->ocrDownloadedLanguages();
+        for (const auto& lang : langs) {
+            // Friendly name from the BCP-47 tag, e.g. "Russian (ru-RU)".
+            const QLocale loc(lang);
+            const QString name = QLocale::languageToString(loc.language());
+            QString label = (name.isEmpty() || name == QLatin1String("C"))
+                                ? lang
+                                : tr("%1 (%2)").arg(name, lang);
+            // Flag languages whose recognition model is not present yet (Linux
+            // PaddleOCR fetches it on first use). Guard against an empty
+            // downloaded list (not yet reported) to avoid falsely flagging all.
+            if (!downloaded.isEmpty() && !downloaded.contains(lang))
+                label += tr(" - needs download");
+            ocrLanguageCombo->addItem(label, lang);
+        }
     }
     layout->addWidget(ocrLanguageCombo);
 

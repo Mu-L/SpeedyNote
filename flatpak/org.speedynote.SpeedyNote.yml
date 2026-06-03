@@ -17,6 +17,10 @@ finish-args:
   # Access ~/Documents for notebook storage and PDF files.
   # Other locations are accessible via the file chooser portal.
   - --filesystem=xdg-documents
+  # On-demand OCR model download (Phase 4D): the bundled latin/ch/korean models
+  # work offline; selecting an additional script (cyrillic/arabic/devanagari)
+  # fetches that model from RapidOCR into ~/.var/app/.../data/SpeedyNote/ocr-models.
+  - --share=network
 cleanup:
   - /include
 modules:
@@ -68,8 +72,9 @@ modules:
   # (linux/onnxruntime-build + linux/ocr-models). CMake then auto-enables
   # PaddleOCR and installs libonnxruntime.so* to /app/lib and the models to
   # /app/share/speedynote/ocr-models; the INSTALL_RPATH=$ORIGIN/../lib resolves
-  # /app/bin -> /app/lib at runtime. OCR is CPU-only and reads bundled models,
-  # so no extra finish-args (network/devices) are required.
+  # /app/bin -> /app/lib at runtime. OCR is CPU-only. The bundled models work
+  # offline; --share=network (in finish-args above) is only needed so the
+  # Phase 4D on-demand download can fetch additional script models at runtime.
   #
   # NOTE: this file is a MIRROR of the manifest in the Flathub repository; the
   # same changes must be made there. The ONNX Runtime archive SHA256 and the

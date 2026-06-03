@@ -24,6 +24,7 @@
 
 #include "RasterOcrEngine.h"
 
+#include <QSet>
 #include <QString>
 #include <QStringList>
 
@@ -41,6 +42,10 @@ public:
     QString engineId() const override { return QStringLiteral("paddle_ocr"); }
     bool isAvailable() const override;
     QStringList availableLanguages() const override;
+    QStringList downloadedLanguages() const override;
+    /// Clears the per-session failed-download cache on a real language change,
+    /// then defers to the base (cache invalidation + tag normalization).
+    void setLanguage(const QString& recognizerName) override;
 
 protected:
     ImageRecognition recognizeImage(const QImage& strip,
@@ -49,24 +54,42 @@ protected:
     /// PP-OCRv5 mobile recognition models expect ~48 px input height.
     int targetStripHeightPx() const override { return 48; }
 
+    /// Map a BCP-47-ish language tag to a recognition model file name (by
+    /// script). The mapped file may be bundled or downloadable on demand.
+    /// Protected so test harnesses can exercise the mapping without I/O.
+    static QString modelFileForLanguage(const QString& languageTag);
+
 private:
     struct Model;  ///< Ort::Session + decoded char table + IO names (defined in .cpp)
     struct Impl;   ///< shared Ort::Env (defined in .cpp)
 
     /// Resolve + lazily load (and cache) the recognition model for a language
-    /// tag. Returns nullptr if the model file cannot be found or loaded.
+    /// tag. Triggers an on-demand download into the writable dir if the file is
+    /// absent (Phase 4D). Returns nullptr if no model can be found or loaded.
     Model* modelForLanguage(const QString& languageTag);
 
-    /// Absolute path to the bundled models directory, or empty if none found.
-    /// Memoized once resolved (the install layout does not change at runtime).
-    QString resolvedModelsDir() const;
-    /// Map a BCP-47-ish language tag to a bundled model file name.
-    static QString modelFileForLanguage(const QString& languageTag);
+    /// Ordered list of directories to probe for model files. The user-writable
+    /// XDG data dir comes first so on-demand downloads (Phase 4D) shadow the
+    /// read-only install. The remaining entries are the bundled/dev locations.
+    QStringList modelSearchDirs() const;
+    /// User-writable directory for on-demand-downloaded models (XDG data
+    /// location). Not guaranteed to exist yet; created on first download.
+    QString writableModelsDir() const;
+    /// Absolute path to @p fileName in the first search dir that has it, or
+    /// empty if no search dir contains it. Re-scans each call so a freshly
+    /// downloaded model is picked up without restart.
+    QString findModelFile(const QString& fileName) const;
+    /// Download @p fileName (a catalog model) into the writable dir, verifying
+    /// its pinned SHA256. Blocking; runs on the OCR worker thread. Returns true
+    /// only when the verified file is in place.
+    bool ensureModelDownloaded(const QString& fileName);
 
     std::unique_ptr<Impl> m_impl;                        ///< shared Ort::Env
     std::map<QString, std::unique_ptr<Model>> m_models;  ///< key = model file name
                                                          ///< (std::map: move-only values OK)
-    mutable QString m_modelsDir;                         ///< cached resolvedModelsDir()
+    QSet<QString> m_downloadFailed;                      ///< model files whose download
+                                                         ///< failed this session (skip retry
+                                                         ///< until the language changes)
 };
 
 #endif // SPEEDYNOTE_HAS_PADDLE_OCR

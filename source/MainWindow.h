@@ -132,6 +132,8 @@ public:
 
     // OCR language query (for ControlPanelDialog and per-document dialog)
     QStringList ocrAvailableLanguages() const { return m_ocrAvailableLanguages; }
+    // Subset already present locally; the rest need an on-demand download.
+    QStringList ocrDownloadedLanguages() const { return m_ocrDownloadedLanguages; }
 
     // Theme settings
     QColor customAccentColor;
@@ -621,6 +623,7 @@ private:
     QTimer *m_ocrDebounceTimer = nullptr;
     bool m_autoOcrEnabled = false;
     QStringList m_ocrAvailableLanguages;
+    QStringList m_ocrDownloadedLanguages;
     std::set<std::pair<int,int>> m_ocrTempLoadedTiles;
     Document* m_ocrTempLoadedDoc = nullptr;
     

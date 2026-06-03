@@ -160,34 +160,33 @@ struct OcrTextBlock {
 };
 
 /**
- * @brief Flatten a block's per-character geometry into a text-length rect array.
+ * @brief Flatten per-character geometry into a @p text-length rect array.
  *
- * Returns a vector of size @c block.text.length() where entry @c i is the
- * canvas-space rect for @c block.text[i], sourced from
- * @c wordSegments[].charBoundingBoxes. The engine fills those boxes in
- * @c block.text order, one per non-whitespace character, skipping spaces
- * (see RasterOcrEngine::buildResult). Whitespace characters therefore carry no
- * box; a thin gap rect spanning the space between the surrounding characters is
- * synthesized so the returned indices stay aligned with @c block.text (this keeps
- * drag-selection contiguous across word boundaries).
+ * Returns a vector of size @c text.length() where entry @c i is the canvas-space
+ * rect for @c text[i], sourced from @c segments[].charBoundingBoxes. The engine
+ * fills those boxes in @c text order, one per non-whitespace character, skipping
+ * spaces (see RasterOcrEngine::buildResult). Whitespace characters therefore
+ * carry no box; a thin gap rect spanning the space between the surrounding
+ * characters is synthesized so the returned indices stay aligned with @c text
+ * (this keeps drag-selection contiguous across word boundaries).
  *
- * Returns an EMPTY vector when the block has no usable per-character geometry:
- * a single line-level fallback segment (empty @c charBoundingBoxes), any
- * segment whose box count disagrees with its text length, or a non-space/box
- * count mismatch. Callers must then fall back to proportional splitting of the
- * block bounding rect (mirrors the PdfTextBox::charBoundingBoxes -> boundingBox
+ * Returns an EMPTY vector when there is no usable per-character geometry: a
+ * single line-level fallback segment (empty @c charBoundingBoxes), any segment
+ * whose box count disagrees with its text length, or a non-space/box count
+ * mismatch. Callers must then fall back to proportional splitting of the block
+ * bounding rect (mirrors the PdfTextBox::charBoundingBoxes -> boundingBox
  * fallback used by the PDF consumers).
  */
-inline QVector<QRectF> flattenOcrBlockCharRects(const OcrTextBlock& block) {
-    const QString& text = block.text;
+inline QVector<QRectF> flattenOcrCharRects(const QString& text,
+                                           const QVector<OcrTextBlock::WordSegment>& segments) {
     const int n = text.length();
-    if (n == 0 || block.wordSegments.isEmpty())
+    if (n == 0 || segments.isEmpty())
         return {};
 
     // Collect per-character boxes in segment order (one per non-space char).
     QVector<QRectF> segBoxes;
     segBoxes.reserve(n);
-    for (const auto& seg : block.wordSegments) {
+    for (const auto& seg : segments) {
         if (seg.charBoundingBoxes.size() != seg.text.length())
             return {};  // missing/partial geometry -> signal fallback
         for (const auto& cb : seg.charBoundingBoxes)
@@ -236,6 +235,12 @@ inline QVector<QRectF> flattenOcrBlockCharRects(const OcrTextBlock& block) {
         // a default-constructed rect; harmless.
     }
     return out;
+}
+
+/// Convenience overload: flatten a whole block's per-character geometry.
+/// See flattenOcrCharRects() for the size/fallback contract.
+inline QVector<QRectF> flattenOcrBlockCharRects(const OcrTextBlock& block) {
+    return flattenOcrCharRects(block.text, block.wordSegments);
 }
 
 Q_DECLARE_METATYPE(OcrTextBlock)

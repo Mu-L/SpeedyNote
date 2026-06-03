@@ -382,6 +382,50 @@ inline bool testFlattenBlockCharRects()
     return ok;
 }
 
+// ----------------------------------------------------------------------------
+// Test: the flattenOcrCharRects(text, segments) overload (used by the OCR text
+// overlay, OcrTextObject::render) is bit-for-bit consistent with the block
+// helper that search + selection use. Same geometry source -> same rects.
+// (Phase 4D overlay consumer wiring.)
+// ----------------------------------------------------------------------------
+inline bool testFlattenCharRectsOverload()
+{
+    qDebug() << "=== Test: Flatten Char Rects Overload (4D overlay) ===";
+    bool ok = true;
+
+    OcrTextBlock block = OcrTextBlock::create();
+    block.text = QStringLiteral("hi yo");
+    block.boundingRect = QRectF(0, 0, 110, 20);
+    OcrTextBlock::WordSegment s0;
+    s0.text = QStringLiteral("hi");
+    s0.charBoundingBoxes = {QRectF(0, 0, 25, 20), QRectF(25, 0, 25, 20)};
+    OcrTextBlock::WordSegment s1;
+    s1.text = QStringLiteral("yo");
+    s1.charBoundingBoxes = {QRectF(60, 0, 25, 20), QRectF(85, 0, 25, 20)};
+    block.wordSegments = {s0, s1};
+
+    const QVector<QRectF> viaBlock = flattenOcrBlockCharRects(block);
+    const QVector<QRectF> viaOverload = flattenOcrCharRects(block.text, block.wordSegments);
+
+    bool parity = viaBlock.size() == viaOverload.size() && !viaOverload.isEmpty();
+    for (int i = 0; parity && i < viaOverload.size(); ++i) {
+        parity = nearlyEqual(viaBlock[i].x(), viaOverload[i].x(), 0.01)
+              && nearlyEqual(viaBlock[i].y(), viaOverload[i].y(), 0.01)
+              && nearlyEqual(viaBlock[i].width(), viaOverload[i].width(), 0.01)
+              && nearlyEqual(viaBlock[i].height(), viaOverload[i].height(), 0.01);
+    }
+    qDebug() << "  Overload parity with block helper:" << (parity ? "ok" : "FAIL");
+    ok = ok && parity;
+
+    // Empty segments -> empty result (overlay falls back to run-merge layout).
+    const bool emptyOk = flattenOcrCharRects(QStringLiteral("xy"), {}).isEmpty();
+    qDebug() << "  Empty segments -> empty:" << (emptyOk ? "ok" : "FAIL");
+    ok = ok && emptyOk;
+
+    qDebug() << (ok ? "PASS" : "FAIL") << "- flatten char rects overload";
+    return ok;
+}
+
 inline bool runAllTests()
 {
     qDebug() << "\n========================================";
@@ -396,6 +440,7 @@ inline bool runAllTests()
     allPass &= testSegmentAssembly();
     allPass &= testCharBoxJsonRoundTrip();
     allPass &= testFlattenBlockCharRects();
+    allPass &= testFlattenCharRectsOverload();
 
     qDebug() << "\n========================================";
     qDebug() << (allPass ? "ALL TESTS PASSED!" : "SOME TESTS FAILED!");
