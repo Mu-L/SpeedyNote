@@ -34,6 +34,7 @@ sudo apt install libmupdf-dev libharfbuzz-dev libfreetype-dev libjpeg-dev libope
 | **MuPDF**       | `libmupdf-dev`                                                                          | PDF viewing and export             |
 | **MuPDF deps**  | `libharfbuzz-dev libfreetype-dev libjpeg-dev libopenjp2-7-dev libgumbo-dev libmujs-dev` | MuPDF dependencies                 |
 | **SDL2**        | `libsdl2-dev`                                                                           | Game controller support (optional) |
+| **OCR**         | `curl tar coreutils` (+ vendored ONNX Runtime & models, see below)                      | Handwriting OCR (optional)         |
 
 ---
 
@@ -66,6 +67,50 @@ cmake .. -DENABLE_CONTROLLER_SUPPORT=ON -DENABLE_DEBUG_OUTPUT=ON
 
 ---
 
+### Handwriting OCR (optional)
+
+SpeedyNote can recognize handwritten notes locally and on-device for text search
+and selection. On Linux this uses **PaddleOCR (PP-OCRv5) via a vendored ONNX
+Runtime** (CPU only — no network or GPU required at runtime). It is **optional**:
+a build without it links and runs fine, with the OCR button simply grayed out.
+
+Before building, fetch the vendored ONNX Runtime and the recognition models into
+`linux/`:
+
+```bash
+# ONNX Runtime (CPU). x86_64 is the default; for ARM64 set ORT_ARCH=aarch64.
+./linux/fetch-onnxruntime.sh
+# ORT_ARCH=aarch64 ./linux/fetch-onnxruntime.sh   # ARM64
+
+# PP-OCRv5 mobile recognition models (~tens of MB total)
+./linux/fetch-ocr-models.sh
+
+# Then build as usual — CMake auto-detects the vendored files and enables OCR.
+./compile.sh
+```
+
+At configure time CMake auto-enables `SPEEDYNOTE_ENABLE_PADDLE_OCR` when both the
+vendored ONNX Runtime and the default `latin_rec.onnx` model are present under
+`linux/`; otherwise it prints a warning and OCR stays disabled.
+
+| Model file        | Languages                                       |
+| ----------------- | ----------------------------------------------- |
+| `latin_rec.onnx`  | English + Latin scripts (default, mandatory)    |
+| `ch_rec.onnx`     | Chinese + English + Japanese + Traditional      |
+| `korean_rec.onnx` | Korean                                          |
+
+The character dictionaries are embedded inside each `.onnx` file, so no separate
+dictionary files are needed. The fetch scripts need `curl`, `tar`, and
+`sha256sum`.
+
+> **Packaging note:** `./build-package.sh` (and the release CI) runs these fetch
+> scripts automatically and bundles `libonnxruntime.so*` plus the models into the
+> `.deb`/`.rpm`/Arch packages and the Flatpak, so installed packages ship with
+> OCR enabled. **Alpine/musl is the exception** — the prebuilt ONNX Runtime is a
+> glibc binary, so OCR is intentionally disabled for `.apk` builds.
+
+---
+
 ### Install (Optional)
 
 ```bash
@@ -95,6 +140,19 @@ sudo apt install libmupdf-dev libharfbuzz-dev libfreetype-dev libjpeg-dev libope
 
 ```bash
 sudo apt install qt6-base-dev qt6-tools-dev
+```
+
+#### OCR button is grayed out / OCR unavailable
+
+**Message (at configure time):** `PaddleOCR raster OCR: DISABLED -- vendored ONNX Runtime or default model not found under linux/`
+
+**Fix:** Fetch the vendored ONNX Runtime and models, then reconfigure (see
+[Handwriting OCR](#handwriting-ocr-optional)):
+
+```bash
+./linux/fetch-onnxruntime.sh
+./linux/fetch-ocr-models.sh
+rm -rf build && ./compile.sh   # reconfigure so CMake re-detects the files
 ```
 
 ---
