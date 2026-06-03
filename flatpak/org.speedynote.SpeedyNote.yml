@@ -108,18 +108,30 @@ modules:
         strip-components: 1
       # --- PP-OCRv5 mobile recognition models (arch-independent) ------------
       # SHA256s match linux/fetch-ocr-models.sh. Dicts are embedded in the ONNX.
+      #
+      # IMPORTANT: ModelScope is the PRIMARY url and HuggingFace is a fallback
+      # mirror (same order as linux/fetch-ocr-models.sh). HuggingFace's resolve/
+      # CDN returns HTTP 429 (rate limit) for Flathub's shared build IPs, which
+      # fails the download phase if it is the only source. flatpak-builder tries
+      # `url` first and falls back to each `mirror-urls` entry on failure.
       - type: file
-        url: https://huggingface.co/RapidAI/RapidOCR/resolve/v3.8.0/onnx/PP-OCRv5/rec/latin_PP-OCRv5_rec_mobile.onnx
+        url: https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.8.0/onnx/PP-OCRv5/rec/latin_PP-OCRv5_rec_mobile.onnx
+        mirror-urls:
+          - https://huggingface.co/RapidAI/RapidOCR/resolve/v3.8.0/onnx/PP-OCRv5/rec/latin_PP-OCRv5_rec_mobile.onnx
         sha256: b20bd37c168a570f583afbc8cd7925603890efbcdc000a59e22c269d160b5f5a
         dest: linux/ocr-models
         dest-filename: latin_rec.onnx
       - type: file
-        url: https://huggingface.co/RapidAI/RapidOCR/resolve/v3.8.0/onnx/PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile.onnx
+        url: https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.8.0/onnx/PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile.onnx
+        mirror-urls:
+          - https://huggingface.co/RapidAI/RapidOCR/resolve/v3.8.0/onnx/PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile.onnx
         sha256: 5825fc7ebf84ae7a412be049820b4d86d77620f204a041697b0494669b1742c5
         dest: linux/ocr-models
         dest-filename: ch_rec.onnx
       - type: file
-        url: https://huggingface.co/RapidAI/RapidOCR/resolve/v3.8.0/onnx/PP-OCRv5/rec/korean_PP-OCRv5_rec_mobile.onnx
+        url: https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.8.0/onnx/PP-OCRv5/rec/korean_PP-OCRv5_rec_mobile.onnx
+        mirror-urls:
+          - https://huggingface.co/RapidAI/RapidOCR/resolve/v3.8.0/onnx/PP-OCRv5/rec/korean_PP-OCRv5_rec_mobile.onnx
         sha256: cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9c41a2e541a25773c9b
         dest: linux/ocr-models
         dest-filename: korean_rec.onnx
