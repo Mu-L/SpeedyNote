@@ -159,5 +159,84 @@ struct OcrTextBlock {
     }
 };
 
+/**
+ * @brief Flatten a block's per-character geometry into a text-length rect array.
+ *
+ * Returns a vector of size @c block.text.length() where entry @c i is the
+ * canvas-space rect for @c block.text[i], sourced from
+ * @c wordSegments[].charBoundingBoxes. The engine fills those boxes in
+ * @c block.text order, one per non-whitespace character, skipping spaces
+ * (see RasterOcrEngine::buildResult). Whitespace characters therefore carry no
+ * box; a thin gap rect spanning the space between the surrounding characters is
+ * synthesized so the returned indices stay aligned with @c block.text (this keeps
+ * drag-selection contiguous across word boundaries).
+ *
+ * Returns an EMPTY vector when the block has no usable per-character geometry:
+ * a single line-level fallback segment (empty @c charBoundingBoxes), any
+ * segment whose box count disagrees with its text length, or a non-space/box
+ * count mismatch. Callers must then fall back to proportional splitting of the
+ * block bounding rect (mirrors the PdfTextBox::charBoundingBoxes -> boundingBox
+ * fallback used by the PDF consumers).
+ */
+inline QVector<QRectF> flattenOcrBlockCharRects(const OcrTextBlock& block) {
+    const QString& text = block.text;
+    const int n = text.length();
+    if (n == 0 || block.wordSegments.isEmpty())
+        return {};
+
+    // Collect per-character boxes in segment order (one per non-space char).
+    QVector<QRectF> segBoxes;
+    segBoxes.reserve(n);
+    for (const auto& seg : block.wordSegments) {
+        if (seg.charBoundingBoxes.size() != seg.text.length())
+            return {};  // missing/partial geometry -> signal fallback
+        for (const auto& cb : seg.charBoundingBoxes)
+            segBoxes.append(cb);
+    }
+    if (segBoxes.isEmpty())
+        return {};
+
+    QVector<QRectF> out(n);
+    QVector<bool> filled(n, false);
+    int s = 0;
+    for (int i = 0; i < n; ++i) {
+        if (text[i].isSpace())
+            continue;  // resolved into a gap rect below
+        if (s >= segBoxes.size())
+            return {};  // non-space chars outnumber boxes -> mismatch
+        out[i] = segBoxes[s++];
+        filled[i] = true;
+    }
+    if (s != segBoxes.size())
+        return {};  // boxes outnumber non-space chars -> mismatch
+
+    // Resolve whitespace placeholders into thin gap rects between neighbours.
+    for (int i = 0; i < n; ++i) {
+        if (filled[i])
+            continue;
+        QRectF left, right;
+        bool hasL = false, hasR = false;
+        for (int j = i - 1; j >= 0; --j)
+            if (filled[j]) { left = out[j]; hasL = true; break; }
+        for (int j = i + 1; j < n; ++j)
+            if (filled[j]) { right = out[j]; hasR = true; break; }
+        if (hasL && hasR) {
+            const qreal x0 = left.right();
+            const qreal x1 = right.left();
+            const qreal w = x1 > x0 ? (x1 - x0) : 0.0;
+            const qreal top = qMin(left.top(), right.top());
+            const qreal bottom = qMax(left.bottom(), right.bottom());
+            out[i] = QRectF(x0, top, w, bottom - top);
+        } else if (hasL) {
+            out[i] = QRectF(left.right(), left.top(), 0.0, left.height());
+        } else if (hasR) {
+            out[i] = QRectF(right.left(), right.top(), 0.0, right.height());
+        }
+        // else: block is all whitespace (won't happen for valid text) -> leave
+        // a default-constructed rect; harmless.
+    }
+    return out;
+}
+
 Q_DECLARE_METATYPE(OcrTextBlock)
 Q_DECLARE_METATYPE(QVector<OcrTextBlock>)

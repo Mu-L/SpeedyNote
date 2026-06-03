@@ -291,6 +291,97 @@ inline bool testCharBoxJsonRoundTrip()
     return ok;
 }
 
+// ----------------------------------------------------------------------------
+// Test: flattenOcrBlockCharRects maps block.text to per-char rects, synthesizes
+// gap rects for spaces, and returns empty when geometry is missing/mismatched.
+// (Phase 4E consumer-wiring helper used by search + selection.)
+// ----------------------------------------------------------------------------
+inline bool testFlattenBlockCharRects()
+{
+    qDebug() << "=== Test: Flatten Block Char Rects (4E) ===";
+    bool ok = true;
+
+    // Latin with an inter-word space: "hi yo".
+    {
+        OcrTextBlock block = OcrTextBlock::create();
+        block.text = QStringLiteral("hi yo");
+        block.boundingRect = QRectF(0, 0, 110, 20);
+        OcrTextBlock::WordSegment s0;
+        s0.text = QStringLiteral("hi");
+        s0.charBoundingBoxes = {QRectF(0, 0, 25, 20), QRectF(25, 0, 25, 20)};
+        OcrTextBlock::WordSegment s1;
+        s1.text = QStringLiteral("yo");
+        s1.charBoundingBoxes = {QRectF(60, 0, 25, 20), QRectF(85, 0, 25, 20)};
+        block.wordSegments = {s0, s1};
+
+        const QVector<QRectF> flat = flattenOcrBlockCharRects(block);
+        bool latinOk = flat.size() == 5;                 // 'h','i',' ','y','o'
+        latinOk = latinOk && nearlyEqual(flat[0].x(), 0.0, 0.01);
+        latinOk = latinOk && nearlyEqual(flat[1].x(), 25.0, 0.01);
+        latinOk = latinOk && nearlyEqual(flat[3].x(), 60.0, 0.01);
+        latinOk = latinOk && nearlyEqual(flat[4].x(), 85.0, 0.01);
+        // Space gap spans from box[1].right (50) to box[2].left (60).
+        latinOk = latinOk && nearlyEqual(flat[2].left(), 50.0, 0.01)
+                          && nearlyEqual(flat[2].width(), 10.0, 0.01)
+                          && nearlyEqual(flat[2].height(), 20.0, 0.01);
+        qDebug() << "  Latin + space:" << (latinOk ? "ok" : "FAIL");
+        ok = ok && latinOk;
+    }
+
+    // CJK: "你好" -> one box each, no spaces.
+    {
+        OcrTextBlock block = OcrTextBlock::create();
+        block.text = QString::fromUtf8("\xE4\xBD\xA0\xE5\xA5\xBD"); // 你好
+        block.boundingRect = QRectF(0, 0, 40, 20);
+        OcrTextBlock::WordSegment g0;
+        g0.text = block.text.mid(0, 1);
+        g0.charBoundingBoxes = {QRectF(0, 0, 20, 20)};
+        OcrTextBlock::WordSegment g1;
+        g1.text = block.text.mid(1, 1);
+        g1.charBoundingBoxes = {QRectF(20, 0, 20, 20)};
+        block.wordSegments = {g0, g1};
+
+        const QVector<QRectF> flat = flattenOcrBlockCharRects(block);
+        bool cjkOk = flat.size() == 2
+                  && nearlyEqual(flat[0].x(), 0.0, 0.01)
+                  && nearlyEqual(flat[1].x(), 20.0, 0.01);
+        qDebug() << "  CJK glyphs:" << (cjkOk ? "ok" : "FAIL");
+        ok = ok && cjkOk;
+    }
+
+    // Fallback: single line-level segment with no char boxes -> empty result.
+    {
+        OcrTextBlock block = OcrTextBlock::create();
+        block.text = QStringLiteral("fallback");
+        block.boundingRect = QRectF(0, 0, 80, 20);
+        OcrTextBlock::WordSegment seg;
+        seg.text = QStringLiteral("fallback");  // no charBoundingBoxes
+        block.wordSegments = {seg};
+
+        const bool fbOk = flattenOcrBlockCharRects(block).isEmpty();
+        qDebug() << "  Missing geometry -> empty:" << (fbOk ? "ok" : "FAIL");
+        ok = ok && fbOk;
+    }
+
+    // Mismatch: box count != text length -> empty result.
+    {
+        OcrTextBlock block = OcrTextBlock::create();
+        block.text = QStringLiteral("ab");
+        block.boundingRect = QRectF(0, 0, 50, 20);
+        OcrTextBlock::WordSegment seg;
+        seg.text = QStringLiteral("ab");
+        seg.charBoundingBoxes = {QRectF(0, 0, 25, 20)};  // only 1 box for 2 chars
+        block.wordSegments = {seg};
+
+        const bool mmOk = flattenOcrBlockCharRects(block).isEmpty();
+        qDebug() << "  Size mismatch -> empty:" << (mmOk ? "ok" : "FAIL");
+        ok = ok && mmOk;
+    }
+
+    qDebug() << (ok ? "PASS" : "FAIL") << "- flatten block char rects";
+    return ok;
+}
+
 inline bool runAllTests()
 {
     qDebug() << "\n========================================";
@@ -304,6 +395,7 @@ inline bool runAllTests()
     allPass &= testCacheHitEvict();
     allPass &= testSegmentAssembly();
     allPass &= testCharBoxJsonRoundTrip();
+    allPass &= testFlattenBlockCharRects();
 
     qDebug() << "\n========================================";
     qDebug() << (allPass ? "ALL TESTS PASSED!" : "SOME TESTS FAILED!");

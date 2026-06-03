@@ -19,6 +19,9 @@ option(SPEEDYNOTE_ENABLE_PADDLE_OCR "Enable PaddleOCR raster OCR (Linux, via ven
 message(STATUS "Controller support: ${ENABLE_CONTROLLER_SUPPORT}")
 if(ENABLE_DEBUG_OUTPUT)
     add_compile_definitions(SPEEDYNOTE_DEBUG)
+    # Absolute source dir so debug-only golden-image tests can locate baselines
+    # under tests/ocr/golden/ at runtime (see source/ocr/OcrGoldenTests.h).
+    add_compile_definitions(SPEEDYNOTE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
     message(STATUS "Debug output: ENABLED")
 else()
     message(STATUS "Debug output: DISABLED")

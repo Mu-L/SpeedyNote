@@ -2200,11 +2200,13 @@ private:
     /**
      * @brief Cached per-character bounding boxes for one OCR block.
      *
-     * OCR blocks (OcrTextBlock) expose either per-word segments or a single
-     * bounding rect for the whole block. To mirror the PDF selection experience
-     * we precompute a per-character bounding rect for every character in the
-     * block's logical text, using proportional splitting within each word
-     * segment (same approach as PdfSearchEngine::searchOcrBlocks).
+     * OCR blocks (OcrTextBlock) expose either per-word segments with per-character
+     * geometry or a single bounding rect for the whole block. To mirror the PDF
+     * selection experience we precompute a per-character bounding rect for every
+     * character in the block's logical text: when the engine provides real
+     * per-character boxes we flatten those (via flattenOcrBlockCharRects), and we
+     * fall back to proportional splitting of the block rect otherwise (the same
+     * source/fallback policy as PdfSearchEngine::searchOcrBlocks).
      *
      * All rectangles are in **page-local (page) coordinates**, which is what
      * OcrTextBlock exposes directly - no PDF_TO_PAGE_SCALE conversion needed.

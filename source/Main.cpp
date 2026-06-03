@@ -274,6 +274,7 @@ static void applyAndroidFonts(QApplication& app)
 #include "pdf/MuPdfExporterTests.h"
 #include "ui/ToolbarButtonTestWidget.h"
 #include "ocr/OcrRasterTests.h"
+#include "ocr/OcrGoldenTests.h"
 #ifdef SPEEDYNOTE_HAS_VISION_OCR
 #include "ocr/OcrVisionTests.h"
 #endif
@@ -620,6 +621,8 @@ static int runTests(const QString& testType)
         success = MuPdfExporterTests::runAllTests();
     } else if (testType == "ocr-raster") {
         success = OcrRasterTests::runAllTests();
+    } else if (testType == "ocr-golden") {
+        success = OcrGoldenTests::runAllTests();
 #ifdef SPEEDYNOTE_HAS_VISION_OCR
     } else if (testType == "ocr-vision") {
         success = OcrVisionTests::runAllTests();
@@ -958,6 +961,8 @@ int main(int argc, char* argv[])
             testToRun = "pdfexporter";
         } else if (arg == "--test-ocr-raster") {
             testToRun = "ocr-raster";
+        } else if (arg == "--test-ocr-golden") {
+            testToRun = "ocr-golden";
         } else if (arg == "--test-ocr-vision") {
             testToRun = "ocr-vision";
         } else if (arg == "--test-ocr-paddle") {

@@ -10633,11 +10633,13 @@ void DocumentViewport::loadOcrBlocksForPage(int pageIndex)
         return;
     }
 
-    // Shared block-to-OcrBlockRef builder. Computes per-character rects by
-    // proportional splitting of the block's bounding rect. This mirrors
-    // PdfSearchEngine::searchOcrBlocks so that text-selection highlights
-    // line up with search highlights. Returns false if the block is empty
-    // or has an invalid bounding rect (caller should skip).
+    // Shared block-to-OcrBlockRef builder. Fills per-character rects from the
+    // engine's real per-character geometry (wordSegments[].charBoundingBoxes,
+    // flattened to block.text length); when that geometry is unavailable it
+    // falls back to a proportional split of the block's bounding rect. The same
+    // source/fallback policy is used by PdfSearchEngine::searchOcrBlocks so that
+    // text-selection highlights line up with search highlights. Returns false if
+    // the block is empty or has an invalid bounding rect (caller should skip).
     auto buildRef = [](const OcrTextBlock& block, QPointF originOffset,
                        OcrBlockRef& outRef) -> bool {
         if (block.text.isEmpty() || !block.boundingRect.isValid()) return false;
@@ -10649,12 +10651,24 @@ void DocumentViewport::loadOcrBlocksForPage(int pageIndex)
         const int n = outRef.text.length();
         if (n > 0) {
             outRef.charRects.resize(n);
-            const qreal charW = outRef.blockRect.width() / n;
-            const qreal top = outRef.blockRect.top();
-            const qreal left = outRef.blockRect.left();
-            const qreal height = outRef.blockRect.height();
-            for (int i = 0; i < n; ++i) {
-                outRef.charRects[i] = QRectF(left + i * charW, top, charW, height);
+            const QVector<QRectF> flat = flattenOcrBlockCharRects(block);
+            if (flat.size() == n) {
+                // Real per-character boxes (canvas space); shift into document
+                // space for edgeless tiles via originOffset.
+                for (int i = 0; i < n; ++i) {
+                    outRef.charRects[i] = originOffset.isNull()
+                        ? flat[i]
+                        : flat[i].translated(originOffset);
+                }
+            } else {
+                // Fallback: proportional split of the block bounding rect.
+                const qreal charW = outRef.blockRect.width() / n;
+                const qreal top = outRef.blockRect.top();
+                const qreal left = outRef.blockRect.left();
+                const qreal height = outRef.blockRect.height();
+                for (int i = 0; i < n; ++i) {
+                    outRef.charRects[i] = QRectF(left + i * charW, top, charW, height);
+                }
             }
         }
         return true;

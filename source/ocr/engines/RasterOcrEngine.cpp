@@ -4,6 +4,7 @@
 #include "../OcrStrokeRasterizer.h"
 #include "../OcrTextBlock.h" // isCjkLikeChar
 
+#include <QLocale>
 #include <QSet>
 
 #include <algorithm>
@@ -72,13 +73,33 @@ RasterOcrEngine::~RasterOcrEngine() = default;
 
 void RasterOcrEngine::setLanguage(const QString& recognizerName)
 {
-    if (recognizerName.isEmpty())
-        return;
-    if (recognizerName != m_languageTag) {
+    // Normalize the "auto-detect" sentinels. The OCR UI uses two of them: an
+    // empty string (Settings combo) and the literal "auto" (per-document
+    // dialog). Neither is a valid recognizer tag, so passing them straight
+    // through would make a raster backend mis-recognize - e.g. Apple Vision
+    // would receive recognitionLanguages = @["auto"]. Resolve them to the
+    // system-locale tag when the backend supports it, otherwise to an empty
+    // tag, which each backend treats as "use the engine default" (Vision omits
+    // recognitionLanguages; Paddle falls back to its default latin model).
+    QString resolved = recognizerName;
+    if (resolved.isEmpty() || resolved.compare(QStringLiteral("auto"), Qt::CaseInsensitive) == 0) {
+        resolved.clear();
+        const QString sysTag = QLocale::system().name().replace(QLatin1Char('_'), QLatin1Char('-'));
+        if (!sysTag.isEmpty()) {
+            for (const QString& tag : availableLanguages()) {
+                if (tag.compare(sysTag, Qt::CaseInsensitive) == 0) {
+                    resolved = tag;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (resolved != m_languageTag) {
         // Language change can alter recognized text for the same ink, so the
         // cached per-line results are no longer valid.
         m_lineCache.clear();
-        m_languageTag = recognizerName;
+        m_languageTag = resolved;
     }
 }
 

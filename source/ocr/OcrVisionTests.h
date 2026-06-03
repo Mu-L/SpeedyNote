@@ -116,6 +116,25 @@ inline bool runAllTests()
         }
     }
 
+    // Regression: the "auto" sentinel must be normalized (never passed to Vision
+    // as recognitionLanguages = @["auto"]). After setLanguage("auto") the engine
+    // tag must not be the literal "auto", and recognition must still succeed.
+    {
+        engine.setLanguage(QStringLiteral("auto"));
+        const QString resolved = engine.language();
+        if (resolved.compare(QStringLiteral("auto"), Qt::CaseInsensitive) == 0) {
+            ok = false;
+            qDebug() << "FAIL: 'auto' was not normalized (engine tag still 'auto').";
+        } else {
+            qDebug() << "Auto-detect resolved to tag:" << (resolved.isEmpty() ? "<engine default>" : resolved);
+        }
+        const auto recAuto = engine.runRecognize(strip, resolved);
+        if (recAuto.text.isEmpty()) {
+            ok = false;
+            qDebug() << "FAIL: recognition empty after auto-detect normalization.";
+        }
+    }
+
     qDebug() << "\n========================================";
     qDebug() << (ok ? "ALL TESTS PASSED!" : "SOME TESTS FAILED!");
     qDebug() << "========================================\n";

@@ -8,6 +8,7 @@
 
 #include <QDebug>
 #include <QDir>
+#include <QHash>
 #include <QTextDocument>
 #include <QTextBlock>
 #include <QTextLayout>
@@ -328,6 +329,10 @@ QVector<PdfSearchMatch> PdfSearchEngine::searchOcrBlocks(
         hasPrev = true;
     }
 
+    // Lazily-built per-block flattened char-rect cache (block index -> rects of
+    // size block.text.length(), or empty when the block lacks per-char geometry).
+    QHash<int, QVector<QRectF>> flatCharRectsCache;
+
     int searchPos = 0;
     while (searchPos < fullText.length()) {
         int foundPos = static_cast<int>(fullText.indexOf(text, searchPos, cs));
@@ -351,9 +356,10 @@ QVector<PdfSearchMatch> PdfSearchEngine::searchOcrBlocks(
             }
         }
 
-        // Compute a tight highlight rect using proportional sub-rects within each block.
-        // For each block touched by the match, estimate the horizontal span of the
-        // matched characters based on their positions within the block's text.
+        // Compute a tight highlight rect. Prefer the engine's real per-character
+        // boxes (flattened from wordSegments); fall back to proportional sub-rects
+        // of the block bounding rect when char geometry is unavailable. This
+        // mirrors the PDF text path (box.charBoundingBoxes -> boundingBox).
         QRectF matchRect;
         int matchEnd = foundPos + static_cast<int>(text.length());
         int prevBlockIdx = -1;
@@ -363,12 +369,29 @@ QVector<PdfSearchMatch> PdfSearchEngine::searchOcrBlocks(
         auto flushBlock = [&]() {
             if (prevBlockIdx < 0 || prevBlockIdx >= blocks.size()) return;
             const OcrTextBlock& b = blocks[prevBlockIdx];
-            int blockLen = b.text.length();
-            QRectF subRect = b.boundingRect;
-            if (blockLen > 1) {
-                qreal charW = subRect.width() / blockLen;
-                subRect.setLeft(subRect.left() + charW * blockCharStart);
-                subRect.setWidth(charW * (blockCharEnd - blockCharStart + 1));
+
+            auto it = flatCharRectsCache.find(prevBlockIdx);
+            if (it == flatCharRectsCache.end())
+                it = flatCharRectsCache.insert(prevBlockIdx, flattenOcrBlockCharRects(b));
+            const QVector<QRectF>& flat = it.value();
+
+            QRectF subRect;
+            if (!flat.isEmpty()) {
+                for (int c = blockCharStart; c <= blockCharEnd && c < flat.size(); ++c) {
+                    const QRectF& cr = flat[c];
+                    if (cr.isNull()) continue;  // whitespace edge with no span
+                    subRect = subRect.isNull() ? cr : subRect.united(cr);
+                }
+            }
+            if (subRect.isNull()) {
+                // Fallback: proportional split of the block bounding rect.
+                int blockLen = b.text.length();
+                subRect = b.boundingRect;
+                if (blockLen > 1) {
+                    qreal charW = subRect.width() / blockLen;
+                    subRect.setLeft(subRect.left() + charW * blockCharStart);
+                    subRect.setWidth(charW * (blockCharEnd - blockCharStart + 1));
+                }
             }
             if (matchRect.isNull())
                 matchRect = subRect;
