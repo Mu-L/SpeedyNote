@@ -5962,6 +5962,16 @@ void MainWindow::setupOcr()
     connect(m_ocrWorker, &OcrWorker::languagesAvailable, this, [this](const QStringList& langs) {
         m_ocrAvailableLanguages = langs;
     }, Qt::QueuedConnection);
+    connect(m_ocrWorker, &OcrWorker::downloadedLanguagesAvailable, this, [this](const QStringList& langs) {
+        m_ocrDownloadedLanguages = langs;
+    }, Qt::QueuedConnection);
+    // Engine status (e.g. Linux on-demand model download) -> OCR subtoolbar label.
+    connect(m_ocrWorker, &OcrWorker::statusMessage, this, [this](const QString& message) {
+        if (m_toolbar && m_toolbar->ocrSubToolbar()) {
+            m_toolbar->ocrSubToolbar()->setStatusText(message);
+            m_toolbar->ocrSubToolbar()->clearStatusAfterDelay(8000);
+        }
+    }, Qt::QueuedConnection);
 
     m_ocrThread->start();
 

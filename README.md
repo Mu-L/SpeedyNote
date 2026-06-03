@@ -64,6 +64,7 @@
 
 ### Advanced Features
 
+- **Handwriting OCR** - recognize handwritten notes on-device for text search and selection (macOS & Linux); supports Latin scripts, Chinese, Japanese, and Korean
 - **Link objects** - create clickable links to markdown notes, URLs, or positions
 - **Markdown notes** - attach rich text notes to any page or position
 - **Multi-tab editing** - work on multiple documents simultaneously
@@ -156,7 +157,7 @@ sudo apt update && sudo apt install speedynote
 | All      | CMake 3.16+, C++17 compiler                                                  |
 | Windows  | MSYS2 with clang64/clangarm64 toolchain                                      |
 | macOS    | Xcode Command Line Tools, Homebrew                                           |
-| Linux    | Qt 6.4+ dev packages, Poppler-Qt6                                            |
+| Linux    | Qt 6.4+ dev packages, MuPDF (handwriting OCR optional, see Linux guide)       |
 | Android  | Docker (see [Android Build Guide](./docs/build_docs/ANDROID_BUILD_GUIDE.md)) |
 | iPadOS   | macOS, Xcode 15+, Qt 6.9.3 for iOS (see [iPadOS Build Guide](./docs/build_docs/IOS_BUILD_GUIDE.md)) |
 

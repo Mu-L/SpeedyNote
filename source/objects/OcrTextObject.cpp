@@ -187,6 +187,59 @@ void OcrTextObject::render(QPainter& painter, qreal zoom) const
 
         painter.restore();
     } else {
+        // ===== Per-character path (OCR Phase 4E) =====
+        // When the engine provided real per-character geometry, place each glyph
+        // in its own recognized rect instead of interpolating across merged runs.
+        // Empty -> the geometry is unavailable (or was not persisted) and we fall
+        // through to the run-merging path below.
+        const QVector<QRectF> charRects = flattenOcrCharRects(text, wordSegments);
+        if (charRects.size() == text.length() && !text.isEmpty()) {
+            painter.save();
+
+            if (backgroundColor.alpha() > 0) {
+                painter.setPen(Qt::NoPen);
+                painter.setBrush(backgroundColor);
+                painter.drawRect(lineRect);
+            }
+
+            QColor penColor = fontColor;
+            if (showConfidence && !ocrLocked) {
+                if (confidence < 0.5f)
+                    penColor = QColor(220, 60, 60);
+                else if (confidence < 0.8f)
+                    penColor = QColor(220, 160, 40);
+            }
+            painter.setPen(penColor);
+
+            QFont font;
+            if (!fontFamily.isEmpty())
+                font.setFamily(fontFamily);
+
+            for (int i = 0; i < text.length(); ++i) {
+                const QChar ch = text.at(i);
+                if (ch.isSpace())
+                    continue; // gap rect carries no glyph
+                const QRectF& cr = charRects[i];
+                QRectF r(cr.x() * zoom, cr.y() * zoom,
+                         cr.width() * zoom, cr.height() * zoom);
+                if (r.width() < 0.5 || r.height() < 0.5)
+                    continue;
+
+                qreal px = r.height() * 0.72;
+                if (px < 1.0)
+                    px = 1.0;
+                font.setPixelSize(static_cast<int>(px));
+                painter.setFont(font);
+                painter.drawText(r, Qt::AlignHCenter | Qt::AlignVCenter, QString(ch));
+            }
+
+            if (ocrLocked)
+                drawLockBadge(painter, lineRect);
+
+            painter.restore();
+            return;
+        }
+
         // ===== Original run-merging path (snap disabled) =====
 
         // --- Step 2: compute average segment height for gap threshold ---
@@ -312,6 +365,20 @@ QJsonObject OcrTextObject::toJson() const
             r.append(seg.boundingRect.width());
             r.append(seg.boundingRect.height());
             w["r"] = r;
+            // Optional per-character quads (OCR Phase 4E); only written when
+            // present so the overlay can place glyphs precisely after reload.
+            if (!seg.charBoundingBoxes.isEmpty()) {
+                QJsonArray chars;
+                for (const auto& cb : seg.charBoundingBoxes) {
+                    QJsonArray cr;
+                    cr.append(cb.x());
+                    cr.append(cb.y());
+                    cr.append(cb.width());
+                    cr.append(cb.height());
+                    chars.append(cr);
+                }
+                w["c"] = chars;
+            }
             words.append(w);
         }
         obj["words"] = words;
@@ -338,6 +405,12 @@ void OcrTextObject::loadFromJson(const QJsonObject& obj)
         if (r.size() == 4)
             seg.boundingRect = QRectF(r[0].toDouble(), r[1].toDouble(),
                                       r[2].toDouble(), r[3].toDouble());
+        for (const auto& cval : w["c"].toArray()) {
+            QJsonArray cr = cval.toArray();
+            if (cr.size() == 4)
+                seg.charBoundingBoxes.append(QRectF(cr[0].toDouble(), cr[1].toDouble(),
+                                                    cr[2].toDouble(), cr[3].toDouble()));
+        }
         wordSegments.append(seg);
     }
 }

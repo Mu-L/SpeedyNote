@@ -55,6 +55,10 @@ struct OcrTextBlock {
     struct WordSegment {
         QString text;
         QRectF boundingRect;
+        // Optional per-character geometry. When populated, the invariant
+        // charBoundingBoxes.size() == text.length() holds (mirrors PdfTextBox).
+        // Empty when unavailable; consumers fall back to boundingRect.
+        QVector<QRectF> charBoundingBoxes;
     };
     QVector<WordSegment> wordSegments;
 
@@ -98,6 +102,19 @@ struct OcrTextBlock {
                 r.append(seg.boundingRect.width());
                 r.append(seg.boundingRect.height());
                 w["r"] = r;
+                // Optional per-character quads; only written when present.
+                if (!seg.charBoundingBoxes.isEmpty()) {
+                    QJsonArray chars;
+                    for (const auto& cb : seg.charBoundingBoxes) {
+                        QJsonArray cr;
+                        cr.append(cb.x());
+                        cr.append(cb.y());
+                        cr.append(cb.width());
+                        cr.append(cb.height());
+                        chars.append(cr);
+                    }
+                    w["c"] = chars;
+                }
                 words.append(w);
             }
             obj["words"] = words;
@@ -130,11 +147,101 @@ struct OcrTextBlock {
             if (r.size() == 4)
                 seg.boundingRect = QRectF(r[0].toDouble(), r[1].toDouble(),
                                           r[2].toDouble(), r[3].toDouble());
+            for (const auto& cval : w["c"].toArray()) {
+                QJsonArray cr = cval.toArray();
+                if (cr.size() == 4)
+                    seg.charBoundingBoxes.append(QRectF(cr[0].toDouble(), cr[1].toDouble(),
+                                                        cr[2].toDouble(), cr[3].toDouble()));
+            }
             block.wordSegments.append(seg);
         }
         return block;
     }
 };
+
+/**
+ * @brief Flatten per-character geometry into a @p text-length rect array.
+ *
+ * Returns a vector of size @c text.length() where entry @c i is the canvas-space
+ * rect for @c text[i], sourced from @c segments[].charBoundingBoxes. The engine
+ * fills those boxes in @c text order, one per non-whitespace character, skipping
+ * spaces (see RasterOcrEngine::buildResult). Whitespace characters therefore
+ * carry no box; a thin gap rect spanning the space between the surrounding
+ * characters is synthesized so the returned indices stay aligned with @c text
+ * (this keeps drag-selection contiguous across word boundaries).
+ *
+ * Returns an EMPTY vector when there is no usable per-character geometry: a
+ * single line-level fallback segment (empty @c charBoundingBoxes), any segment
+ * whose box count disagrees with its text length, or a non-space/box count
+ * mismatch. Callers must then fall back to proportional splitting of the block
+ * bounding rect (mirrors the PdfTextBox::charBoundingBoxes -> boundingBox
+ * fallback used by the PDF consumers).
+ */
+inline QVector<QRectF> flattenOcrCharRects(const QString& text,
+                                           const QVector<OcrTextBlock::WordSegment>& segments) {
+    const int n = text.length();
+    if (n == 0 || segments.isEmpty())
+        return {};
+
+    // Collect per-character boxes in segment order (one per non-space char).
+    QVector<QRectF> segBoxes;
+    segBoxes.reserve(n);
+    for (const auto& seg : segments) {
+        if (seg.charBoundingBoxes.size() != seg.text.length())
+            return {};  // missing/partial geometry -> signal fallback
+        for (const auto& cb : seg.charBoundingBoxes)
+            segBoxes.append(cb);
+    }
+    if (segBoxes.isEmpty())
+        return {};
+
+    QVector<QRectF> out(n);
+    QVector<bool> filled(n, false);
+    int s = 0;
+    for (int i = 0; i < n; ++i) {
+        if (text[i].isSpace())
+            continue;  // resolved into a gap rect below
+        if (s >= segBoxes.size())
+            return {};  // non-space chars outnumber boxes -> mismatch
+        out[i] = segBoxes[s++];
+        filled[i] = true;
+    }
+    if (s != segBoxes.size())
+        return {};  // boxes outnumber non-space chars -> mismatch
+
+    // Resolve whitespace placeholders into thin gap rects between neighbours.
+    for (int i = 0; i < n; ++i) {
+        if (filled[i])
+            continue;
+        QRectF left, right;
+        bool hasL = false, hasR = false;
+        for (int j = i - 1; j >= 0; --j)
+            if (filled[j]) { left = out[j]; hasL = true; break; }
+        for (int j = i + 1; j < n; ++j)
+            if (filled[j]) { right = out[j]; hasR = true; break; }
+        if (hasL && hasR) {
+            const qreal x0 = left.right();
+            const qreal x1 = right.left();
+            const qreal w = x1 > x0 ? (x1 - x0) : 0.0;
+            const qreal top = qMin(left.top(), right.top());
+            const qreal bottom = qMax(left.bottom(), right.bottom());
+            out[i] = QRectF(x0, top, w, bottom - top);
+        } else if (hasL) {
+            out[i] = QRectF(left.right(), left.top(), 0.0, left.height());
+        } else if (hasR) {
+            out[i] = QRectF(right.left(), right.top(), 0.0, right.height());
+        }
+        // else: block is all whitespace (won't happen for valid text) -> leave
+        // a default-constructed rect; harmless.
+    }
+    return out;
+}
+
+/// Convenience overload: flatten a whole block's per-character geometry.
+/// See flattenOcrCharRects() for the size/fallback contract.
+inline QVector<QRectF> flattenOcrBlockCharRects(const OcrTextBlock& block) {
+    return flattenOcrCharRects(block.text, block.wordSegments);
+}
 
 Q_DECLARE_METATYPE(OcrTextBlock)
 Q_DECLARE_METATYPE(QVector<OcrTextBlock>)

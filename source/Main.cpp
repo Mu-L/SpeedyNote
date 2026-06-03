@@ -273,6 +273,14 @@ static void applyAndroidFonts(QApplication& app)
 #include "objects/LinkObjectTests.h"
 #include "pdf/MuPdfExporterTests.h"
 #include "ui/ToolbarButtonTestWidget.h"
+#include "ocr/OcrRasterTests.h"
+#include "ocr/OcrGoldenTests.h"
+#ifdef SPEEDYNOTE_HAS_VISION_OCR
+#include "ocr/OcrVisionTests.h"
+#endif
+#ifdef SPEEDYNOTE_HAS_PADDLE_OCR
+#include "ocr/OcrPaddleTests.h"
+#endif
 #endif
 
 // ============================================================================
@@ -611,6 +619,18 @@ static int runTests(const QString& testType)
         success = LinkObjectTests::runAllTests();
     } else if (testType == "pdfexporter") {
         success = MuPdfExporterTests::runAllTests();
+    } else if (testType == "ocr-raster") {
+        success = OcrRasterTests::runAllTests();
+    } else if (testType == "ocr-golden") {
+        success = OcrGoldenTests::runAllTests();
+#ifdef SPEEDYNOTE_HAS_VISION_OCR
+    } else if (testType == "ocr-vision") {
+        success = OcrVisionTests::runAllTests();
+#endif
+#ifdef SPEEDYNOTE_HAS_PADDLE_OCR
+    } else if (testType == "ocr-paddle") {
+        success = OcrPaddleTests::runAllTests();
+#endif
     } else if (testType == "buttons") {
         return QTest::qExec(new ToolbarButtonTests());
     }
@@ -939,6 +959,14 @@ int main(int argc, char* argv[])
             testToRun = "linkobject";
         } else if (arg == "--test-pdfexporter") {
             testToRun = "pdfexporter";
+        } else if (arg == "--test-ocr-raster") {
+            testToRun = "ocr-raster";
+        } else if (arg == "--test-ocr-golden") {
+            testToRun = "ocr-golden";
+        } else if (arg == "--test-ocr-vision") {
+            testToRun = "ocr-vision";
+        } else if (arg == "--test-ocr-paddle") {
+            testToRun = "ocr-paddle";
         }
 #endif
         else if (!arg.startsWith("--") && inputFile.isEmpty()) {

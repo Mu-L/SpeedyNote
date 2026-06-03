@@ -93,6 +93,16 @@ jobs:
           echo "Installed static libmujs:"
           ls -l "/usr/lib/$ARCH_TRIPLET/libmujs."*
 
+      - name: Fetch ONNX Runtime + OCR models (PaddleOCR)
+        run: |
+          # PaddleOCR (Linux OCR backend) needs a vendored, prebuilt ONNX
+          # Runtime and the PP-OCRv5 recognition models. build-package.sh would
+          # fetch these itself, but we run them explicitly so the step is
+          # visible in CI logs and fails fast on a download/checksum error.
+          chmod +x ./linux/fetch-onnxruntime.sh ./linux/fetch-ocr-models.sh
+          ORT_ARCH=x64 ./linux/fetch-onnxruntime.sh
+          ./linux/fetch-ocr-models.sh
+
       - name: Build and create DEB package
         run: |
           chmod +x ./build-package.sh
@@ -132,6 +142,15 @@ jobs:
           dpkg-deb -x "$DEB_FILE" _audit
           BIN=_audit/usr/bin/speedynote
 
+          echo "=== Verifying bundled PaddleOCR runtime ==="
+          ls _audit/usr/lib/libonnxruntime.so* >/dev/null 2>&1 \
+            && echo "  [ok] libonnxruntime.so* bundled in usr/lib" \
+            || { echo "  [MISS] libonnxruntime.so* not bundled in .deb" >&2; exit 1; }
+          test -f _audit/usr/share/speedynote/ocr-models/latin_rec.onnx \
+            && echo "  [ok] OCR models bundled in usr/share/speedynote/ocr-models" \
+            || { echo "  [MISS] ocr-models not bundled in .deb" >&2; exit 1; }
+          echo
+
           echo "=== NEEDED entries (DT_NEEDED) ==="
           objdump -p "$BIN" | grep NEEDED
           echo
@@ -152,6 +171,11 @@ jobs:
               libQt6Core.so.*|libQt6Gui.so.*|libQt6Widgets.so.*)
                 # Covered by libqt6{core6,gui6,widgets6}t64 | libqt6{core6,gui6,widgets6}.
                 echo "  [skip-qt6 ] $lib"
+                continue ;;
+              libonnxruntime.so.*)
+                # Vendored in usr/lib and resolved via the binary's
+                # $ORIGIN/../lib RPATH — no Debian package owns it, by design.
+                echo "  [skip-ort ] $lib"
                 continue ;;
             esac
 
@@ -267,6 +291,14 @@ jobs:
           echo "Installed static libmujs:"
           ls -l "/usr/lib/$ARCH_TRIPLET/libmujs."*
 
+      - name: Fetch ONNX Runtime + OCR models (PaddleOCR)
+        run: |
+          # arm64 build: fetch the aarch64 ONNX Runtime. See the amd64 job for
+          # the rationale; the models are architecture-independent.
+          chmod +x ./linux/fetch-onnxruntime.sh ./linux/fetch-ocr-models.sh
+          ORT_ARCH=aarch64 ./linux/fetch-onnxruntime.sh
+          ./linux/fetch-ocr-models.sh
+
       - name: Build and create DEB package
         run: |
           chmod +x ./build-package.sh
@@ -303,6 +335,15 @@ jobs:
           dpkg-deb -x "$DEB_FILE" _audit
           BIN=_audit/usr/bin/speedynote
 
+          echo "=== Verifying bundled PaddleOCR runtime ==="
+          ls _audit/usr/lib/libonnxruntime.so* >/dev/null 2>&1 \
+            && echo "  [ok] libonnxruntime.so* bundled in usr/lib" \
+            || { echo "  [MISS] libonnxruntime.so* not bundled in .deb" >&2; exit 1; }
+          test -f _audit/usr/share/speedynote/ocr-models/latin_rec.onnx \
+            && echo "  [ok] OCR models bundled in usr/share/speedynote/ocr-models" \
+            || { echo "  [MISS] ocr-models not bundled in .deb" >&2; exit 1; }
+          echo
+
           echo "=== NEEDED entries (DT_NEEDED) ==="
           objdump -p "$BIN" | grep NEEDED
           echo
@@ -321,6 +362,10 @@ jobs:
                 continue ;;
               libQt6Core.so.*|libQt6Gui.so.*|libQt6Widgets.so.*)
                 echo "  [skip-qt6 ] $lib"
+                continue ;;
+              libonnxruntime.so.*)
+                # Vendored in usr/lib, resolved via the binary RPATH (no owner).
+                echo "  [skip-ort ] $lib"
                 continue ;;
             esac
 
@@ -407,8 +452,17 @@ jobs:
             jbig2dec-devel \
             gumbo-parser-devel \
             mujs-devel \
+            patchelf \
             rpm-build \
             rpm-devel
+
+      - name: Fetch ONNX Runtime + OCR models (PaddleOCR)
+        run: |
+          # Fetch the vendored ONNX Runtime + models before packaging so the
+          # source tarball rpmbuild consumes includes linux/, enabling OCR.
+          chmod +x ./linux/fetch-onnxruntime.sh ./linux/fetch-ocr-models.sh
+          ORT_ARCH=x64 ./linux/fetch-onnxruntime.sh
+          ./linux/fetch-ocr-models.sh
 
       - name: Build and create RPM package
         run: |

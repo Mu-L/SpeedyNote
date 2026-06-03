@@ -1,7 +1,7 @@
-cmake_minimum_required(VERSION 3.16)
+﻿cmake_minimum_required(VERSION 3.16)
 cmake_policy(SET CMP0074 NEW)
 
-project(SpeedyNote VERSION 1.4.6 LANGUAGES C CXX)
+project(SpeedyNote VERSION 1.4.7 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -13,10 +13,15 @@ option(ENABLE_DEBUG_OUTPUT "Enable verbose debug output (qDebug prints)" OFF)
 option(ENABLE_SANITIZERS "Enable AddressSanitizer + LeakSanitizer for memory debugging" OFF)
 option(SPEEDYNOTE_ENABLE_WINDOWS_INK_OCR "Enable Windows Ink handwriting recognition (requires Windows 10 1703+)" OFF)
 option(SPEEDYNOTE_ENABLE_MLKIT_INK_OCR "Enable ML Kit Digital Ink OCR (Android/iOS)" OFF)
+option(SPEEDYNOTE_ENABLE_VISION_OCR "Enable Apple Vision OCR (macOS)" OFF)
+option(SPEEDYNOTE_ENABLE_PADDLE_OCR "Enable PaddleOCR raster OCR (Linux, via vendored ONNX Runtime)" OFF)
 
 message(STATUS "Controller support: ${ENABLE_CONTROLLER_SUPPORT}")
 if(ENABLE_DEBUG_OUTPUT)
     add_compile_definitions(SPEEDYNOTE_DEBUG)
+    # Absolute source dir so debug-only golden-image tests can locate baselines
+    # under tests/ocr/golden/ at runtime (see source/ocr/OcrGoldenTests.h).
+    add_compile_definitions(SPEEDYNOTE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
     message(STATUS "Debug output: ENABLED")
 else()
     message(STATUS "Debug output: DISABLED")
@@ -61,6 +66,41 @@ endif()
 if(ANDROID OR IOS)
     set(SPEEDYNOTE_ENABLE_MLKIT_INK_OCR ON CACHE BOOL "" FORCE)
     message(STATUS "ML Kit Digital Ink OCR: ENABLED (${CMAKE_SYSTEM_NAME})")
+endif()
+
+# Auto-enable Apple Vision OCR on macOS desktop (APPLE is true for iOS too,
+# so the explicit "AND NOT IOS" guard is required).
+if(APPLE AND NOT IOS)
+    set(SPEEDYNOTE_ENABLE_VISION_OCR ON CACHE BOOL "" FORCE)
+    message(STATUS "Apple Vision OCR: ENABLED")
+endif()
+
+# The Vision bridge is Objective-C++ (.mm). macOS desktop builds otherwise use
+# only C/C++, so OBJCXX must be enabled explicitly (the iOS branch does the same
+# for the ML Kit bridge).
+if(SPEEDYNOTE_ENABLE_VISION_OCR)
+    enable_language(OBJCXX)
+endif()
+
+# Auto-enable PaddleOCR raster OCR on Linux desktop, but only when the vendored
+# ONNX Runtime AND the mandatory default recognition model are both present
+# (mirrors the iOS ML Kit auto-disable pattern: graceful, no hard failure).
+# Populate them with linux/fetch-onnxruntime.sh + linux/fetch-ocr-models.sh.
+if(UNIX AND NOT APPLE AND NOT ANDROID)
+    set(ONNXRUNTIME_ROOT "${CMAKE_SOURCE_DIR}/linux/onnxruntime-build")
+    file(GLOB _ort_libs "${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so*")
+    if(_ort_libs
+       AND EXISTS "${ONNXRUNTIME_ROOT}/include/onnxruntime_cxx_api.h"
+       AND EXISTS "${CMAKE_SOURCE_DIR}/linux/ocr-models/latin_rec.onnx")
+        set(SPEEDYNOTE_ENABLE_PADDLE_OCR ON CACHE BOOL "" FORCE)
+        message(STATUS "PaddleOCR raster OCR: ENABLED (ONNX Runtime + models found)")
+    else()
+        set(SPEEDYNOTE_ENABLE_PADDLE_OCR OFF CACHE BOOL "" FORCE)
+        message(WARNING "PaddleOCR raster OCR: DISABLED -- vendored ONNX Runtime or "
+                        "default model not found under linux/. OCR will be unavailable "
+                        "on Linux. Run linux/fetch-onnxruntime.sh and "
+                        "linux/fetch-ocr-models.sh, then reconfigure.")
+    endif()
 endif()
 
 if(WIN32)
@@ -778,6 +818,14 @@ set(OCR_SOURCES
     source/ocr/OcrEngine.cpp
     source/ocr/OcrWorker.cpp
 )
+# Platform-agnostic raster OCR pipeline (Phase 4A). Pure Qt; shared base for
+# the desktop image-OCR backends (macOS Vision, Linux PaddleOCR/ONNX). No
+# backend/option needed yet -- createBest() is unchanged until 4B/4C.
+if(NOT ANDROID AND NOT IOS)
+    list(APPEND OCR_SOURCES
+        source/ocr/OcrStrokeRasterizer.cpp
+        source/ocr/engines/RasterOcrEngine.cpp)
+endif()
 if(SPEEDYNOTE_ENABLE_WINDOWS_INK_OCR)
     list(APPEND OCR_SOURCES source/ocr/engines/WindowsInkOcrEngine.cpp)
     # C++/WinRT headers require C++20 for coroutine support
@@ -793,6 +841,17 @@ if(SPEEDYNOTE_ENABLE_MLKIT_INK_OCR)
         set_source_files_properties(source/ocr/engines/MlKitOcrEngine_ios.mm
             PROPERTIES LANGUAGE OBJCXX)
     endif()
+endif()
+if(SPEEDYNOTE_ENABLE_VISION_OCR)
+    # Apple Vision backend (macOS); shares the 4A RasterOcrEngine base above.
+    list(APPEND OCR_SOURCES source/ocr/engines/VisionOcrEngine_macos.mm)
+    set_source_files_properties(source/ocr/engines/VisionOcrEngine_macos.mm
+        PROPERTIES LANGUAGE OBJCXX)
+endif()
+if(SPEEDYNOTE_ENABLE_PADDLE_OCR)
+    # PaddleOCR backend (Linux); shares the 4A RasterOcrEngine base above.
+    # Plain C++ (no OBJCXX); links the vendored ONNX Runtime in the UNIX block.
+    list(APPEND OCR_SOURCES source/ocr/engines/PaddleOcrEngine_linux.cpp)
 endif()
 
 # UI components
@@ -1228,6 +1287,12 @@ elseif(APPLE)
     else()
         message(FATAL_ERROR "MuPDF is required for PDF support on macOS. Install with: brew install mupdf")
     endif()
+    if(SPEEDYNOTE_ENABLE_VISION_OCR)
+        target_compile_definitions(speedynote PRIVATE SPEEDYNOTE_HAS_VISION_OCR)
+        list(APPEND PLATFORM_LIBS
+            "-framework Vision" "-framework CoreGraphics" "-framework Foundation")
+        message(STATUS "Apple Vision OCR: linking Vision/CoreGraphics/Foundation")
+    endif()
     target_link_libraries(speedynote ${PLATFORM_LIBS})
 
 elseif(ANDROID)
@@ -1254,6 +1319,30 @@ elseif(UNIX)
     endif()
     if(ENABLE_CONTROLLER_SUPPORT)
         list(APPEND PLATFORM_LIBS PkgConfig::SDL2)
+    endif()
+    # PaddleOCR raster OCR: vendored ONNX Runtime (CPU EP). ONNXRUNTIME_ROOT was
+    # set during the configure-time gating above.
+    if(SPEEDYNOTE_ENABLE_PADDLE_OCR)
+        target_compile_definitions(speedynote PRIVATE SPEEDYNOTE_HAS_PADDLE_OCR)
+        target_include_directories(speedynote PRIVATE "${ONNXRUNTIME_ROOT}/include")
+        file(GLOB _ort_so "${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so")
+        if(NOT _ort_so)
+            file(GLOB _ort_so "${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so.*")
+        endif()
+        list(GET _ort_so 0 ONNXRUNTIME_LIB)
+        list(APPEND PLATFORM_LIBS "${ONNXRUNTIME_LIB}")
+        # Resolve the bundled .so next to the install (lib/) at runtime.
+        # BUILD_RPATH is set in addition to the auto-generated absolute path to
+        # the vendored lib, so local `./build/speedynote` dev runs still work
+        # AND the build-tree binary that packaging copies verbatim (deb/apk/
+        # arch/rpm never run `cmake --install`) resolves the bundled lib via
+        # $ORIGIN/../lib once installed under <prefix>/bin with the lib in
+        # <prefix>/lib.
+        set_target_properties(speedynote PROPERTIES
+            INSTALL_RPATH "$ORIGIN/../lib"
+            BUILD_RPATH   "$ORIGIN/../lib"
+            BUILD_WITH_INSTALL_RPATH FALSE)
+        message(STATUS "PaddleOCR raster OCR: linking ${ONNXRUNTIME_LIB}")
     endif()
     target_link_libraries(speedynote ${PLATFORM_LIBS})
 endif()
@@ -1301,4 +1390,16 @@ elseif(UNIX AND NOT ANDROID)
     install(FILES resources/icons/mainicon.svg
             DESTINATION share/icons/hicolor/scalable/apps
             RENAME org.speedynote.SpeedyNote.svg)
+    # PaddleOCR raster OCR: bundle the recognition models + the vendored ONNX
+    # Runtime shared library alongside the install (resolved via INSTALL_RPATH).
+    if(SPEEDYNOTE_ENABLE_PADDLE_OCR)
+        file(GLOB OCR_MODEL_FILES "${CMAKE_SOURCE_DIR}/linux/ocr-models/*.onnx")
+        if(OCR_MODEL_FILES)
+            install(FILES ${OCR_MODEL_FILES} DESTINATION share/speedynote/ocr-models)
+        endif()
+        file(GLOB ONNXRUNTIME_SO_FILES "${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so*")
+        if(ONNXRUNTIME_SO_FILES)
+            install(FILES ${ONNXRUNTIME_SO_FILES} DESTINATION lib)
+        endif()
+    endif()
 endif()

@@ -280,10 +280,26 @@ QStringList OcrWorker::availableLanguages() const
 void OcrWorker::initEngine()
 {
     m_engine = OcrEngine::createBest();
+    if (m_engine) {
+        // Forward engine status (e.g. Linux on-demand model download) to the UI.
+        // The callback runs on this worker thread; emitting the signal hops to
+        // the GUI thread via the queued connection MainWindow installs.
+        m_engine->setStatusCallback([this](const QString& message) {
+            emit statusMessage(message);
+        });
+    }
     bool ok = m_engine && m_engine->isAvailable();
     emit engineReady(ok);
-    if (ok)
+    if (ok) {
         emit languagesAvailable(m_engine->availableLanguages());
+        emitDownloadedLanguages();
+    }
+}
+
+void OcrWorker::emitDownloadedLanguages()
+{
+    if (m_engine)
+        emit downloadedLanguagesAvailable(m_engine->downloadedLanguages());
 }
 
 void OcrWorker::setLanguage(const QString& recognizerName)
@@ -320,6 +336,7 @@ QVector<OcrTextBlock> OcrWorker::buildBlocks(const QVector<OcrEngine::Result>& r
             OcrTextBlock::WordSegment seg;
             seg.text = ws.text;
             seg.boundingRect = ws.boundingRect;
+            seg.charBoundingBoxes = ws.charBoundingBoxes;
             block.wordSegments.append(seg);
         }
         blocks.append(block);
@@ -378,6 +395,7 @@ void OcrWorker::processPage(const QString& pageId,
 
         m_busy = false;
         emit resultsReady(pageId, buildBlocks(allResults));
+        emitDownloadedLanguages();
     } else {
         m_engine->clearStrokes();
         m_engine->addStrokes(filtered);
@@ -398,6 +416,7 @@ void OcrWorker::processPage(const QString& pageId,
 
         m_busy = false;
         emit resultsReady(pageId, buildBlocks(results));
+        emitDownloadedLanguages();
     }
 }
 
@@ -482,6 +501,7 @@ void OcrWorker::processPageIncremental(const QString& pageId,
 
     m_busy = false;
     emit resultsReady(pageId, buildBlocks(results));
+    emitDownloadedLanguages();
 }
 
 void OcrWorker::processBatch(const QVector<QString>& pageIds,
@@ -575,4 +595,5 @@ void OcrWorker::processBatch(const QVector<QString>& pageIds,
 
     m_busy = false;
     emit batchFinished(completed, pagesWithText);
+    emitDownloadedLanguages();
 }
