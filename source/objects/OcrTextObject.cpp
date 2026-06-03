@@ -215,6 +215,14 @@ void OcrTextObject::render(QPainter& painter, qreal zoom) const
             if (!fontFamily.isEmpty())
                 font.setFamily(fontFamily);
 
+            // Measure glyphs once at a fixed reference size and scale the advance
+            // linearly, so only one QFontMetricsF is built per render (not per
+            // character) on the paint path.
+            constexpr qreal kRefPx = 100.0;
+            QFont refFont = font;
+            refFont.setPixelSize(static_cast<int>(kRefPx));
+            const QFontMetricsF refFm(refFont);
+
             for (int i = 0; i < text.length(); ++i) {
                 const QChar ch = text.at(i);
                 if (ch.isSpace())
@@ -225,7 +233,17 @@ void OcrTextObject::render(QPainter& painter, qreal zoom) const
                 if (r.width() < 0.5 || r.height() < 0.5)
                     continue;
 
+                // Height-driven size, then shrink to the box width when the
+                // actual glyph would overflow. Keeps ~square CJK glyphs inside
+                // narrow (tall) boxes while leaving naturally-narrow Latin
+                // glyphs (i, l) at full height for a uniform look.
                 qreal px = r.height() * 0.72;
+                const qreal advAtRef = refFm.horizontalAdvance(ch);
+                if (advAtRef > 0.0) {
+                    const qreal predictedW = advAtRef * (px / kRefPx);
+                    if (predictedW > r.width())
+                        px *= r.width() / predictedW;
+                }
                 if (px < 1.0)
                     px = 1.0;
                 font.setPixelSize(static_cast<int>(px));
