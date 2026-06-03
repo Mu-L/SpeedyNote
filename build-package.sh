@@ -277,7 +277,8 @@ get_build_dependencies() {
         rpm)
             # MuPDF for PDF rendering and export (static linking, needs devel packages for build)
             # jbig2dec, gumbo-parser, mujs are MuPDF's optional dependencies
-            echo "cmake, make, pkgconf, qt6-qtbase-devel, qt6-qttools-devel, mupdf-devel, harfbuzz-devel, freetype-devel, libjpeg-turbo-devel, openjpeg2-devel, jbig2dec-devel, gumbo-parser-devel, mujs-devel"
+            # patchelf: clean the binary RUNPATH to $ORIGIN/../lib for the bundled ONNX Runtime
+            echo "cmake, make, pkgconf, qt6-qtbase-devel, qt6-qttools-devel, mupdf-devel, harfbuzz-devel, freetype-devel, libjpeg-turbo-devel, openjpeg2-devel, jbig2dec-devel, gumbo-parser-devel, mujs-devel, patchelf"
             ;;
         arch)
             # MuPDF for PDF rendering and export (static linking)
@@ -381,6 +382,11 @@ detect_deb_runtime_deps() {
                 continue ;;
             libQt6Core.so.*|libQt6Gui.so.*|libQt6Widgets.so.*)
                 echo -e "${YELLOW}    [skip-qt6 ] $soname (declared with t64 alternates)${NC}" >&2
+                continue ;;
+            libonnxruntime.so.*)
+                # Vendored alongside the binary (usr/lib) and resolved via the
+                # $ORIGIN/../lib RPATH — not a Debian package, so no Depends:.
+                echo -e "${YELLOW}    [skip-ort ] $soname (vendored in usr/lib)${NC}" >&2
                 continue ;;
         esac
 
@@ -543,8 +549,56 @@ check_abuild_keys() {
     return 0
 }
 
-# Function to build the project
+# Map `uname -m` to the ORT_ARCH expected by linux/fetch-onnxruntime.sh.
+ort_arch_for_host() {
+    case "$(uname -m)" in
+        x86_64|amd64)  echo "x64" ;;
+        aarch64|arm64) echo "aarch64" ;;
+        *)             echo "" ;;
+    esac
+}
+
+# True when the vendored PaddleOCR dependencies (ONNX Runtime .so + the
+# mandatory default model) are present on disk.
+ocr_deps_present() {
+    [[ -f linux/ocr-models/latin_rec.onnx ]] \
+        && ls linux/onnxruntime-build/lib/libonnxruntime.so* >/dev/null 2>&1
+}
+
+# Fetch the vendored ONNX Runtime + recognition models that PaddleOcrEngine
+# needs. Both fetch scripts are idempotent (they skip when already present),
+# but we still short-circuit here to avoid noisy re-runs. Used only for the
+# glibc package formats (deb/rpm/arch) — the prebuilt ONNX Runtime is glibc
+# and cannot run on Alpine/musl, so apk deliberately skips OCR entirely.
+ensure_ocr_deps() {
+    echo -e "${YELLOW}Ensuring OCR dependencies (ONNX Runtime + models)...${NC}"
+    local ort_arch
+    ort_arch="$(ort_arch_for_host)"
+    if [[ -z "$ort_arch" ]]; then
+        echo -e "${YELLOW}WARNING: unsupported architecture '$(uname -m)' for the prebuilt"
+        echo -e "ONNX Runtime; OCR will be unavailable in this package.${NC}"
+        return 0
+    fi
+
+    chmod +x linux/fetch-onnxruntime.sh linux/fetch-ocr-models.sh 2>/dev/null || true
+
+    if [[ ! -f linux/onnxruntime-build/include/onnxruntime_cxx_api.h ]]; then
+        ORT_ARCH="$ort_arch" ./linux/fetch-onnxruntime.sh
+    else
+        echo -e "${CYAN}ONNX Runtime already vendored.${NC}"
+    fi
+    if [[ ! -f linux/ocr-models/latin_rec.onnx ]]; then
+        ./linux/fetch-ocr-models.sh
+    else
+        echo -e "${CYAN}OCR models already vendored.${NC}"
+    fi
+}
+
+# Function to build the project.
+# Arg 1: "off" to force-disable PaddleOCR (used by the apk/musl path); any
+# other value lets CMake auto-enable it when the vendored deps are present.
 build_project() {
+    local ocr_mode="${1:-auto}"
     echo -e "${YELLOW}Building SpeedyNote...${NC}"
     
     # Detect and display architecture
@@ -579,7 +633,14 @@ build_project() {
     
     # Configure and build with optimizations
     echo -e "${YELLOW}Configuring build with maximum performance optimizations...${NC}"
-    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr ..
+    local ocr_opt=()
+    if [[ "$ocr_mode" == "off" ]]; then
+        # Alpine/musl: the prebuilt glibc ONNX Runtime is unusable here, so
+        # keep PaddleOCR off regardless of any stale vendored dirs on disk.
+        echo -e "${YELLOW}PaddleOCR explicitly disabled for this build (musl/apk).${NC}"
+        ocr_opt=(-DSPEEDYNOTE_ENABLE_PADDLE_OCR=OFF)
+    fi
+    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr "${ocr_opt[@]}" ..
     
     # Determine number of parallel jobs based on architecture
     # ARM64 devices often have limited memory/thermal headroom, so use half the cores
@@ -689,7 +750,24 @@ EOF
     
     # Install desktop file from committed source
     cp data/org.speedynote.SpeedyNote.desktop "$PKG_DIR/usr/share/applications/org.speedynote.SpeedyNote.desktop"
-    
+
+    # Bundle the vendored PaddleOCR runtime: the ONNX Runtime shared library
+    # (resolved at runtime via the binary's $ORIGIN/../lib RPATH) and the
+    # recognition models (found by PaddleOcrEngine at /usr/share/speedynote/
+    # ocr-models). `cp -a` preserves the libonnxruntime.so -> .so.<ver> symlink
+    # chain so the SONAME the binary needs is present without duplicating the
+    # ~15 MB payload. The vendored .so is not a Debian package, so it is skipped
+    # by detect_deb_runtime_deps() and the CI audit (no Depends: entry).
+    if ocr_deps_present; then
+        echo -e "${YELLOW}Bundling PaddleOCR runtime (ONNX Runtime + models)...${NC}"
+        mkdir -p "$PKG_DIR/usr/lib"
+        cp -a linux/onnxruntime-build/lib/libonnxruntime.so* "$PKG_DIR/usr/lib/"
+        mkdir -p "$PKG_DIR/usr/share/speedynote/ocr-models"
+        cp linux/ocr-models/*.onnx "$PKG_DIR/usr/share/speedynote/ocr-models/"
+    else
+        echo -e "${YELLOW}PaddleOCR deps not present; .deb will ship without OCR.${NC}"
+    fi
+
     # Build package
     dpkg-deb --build "$PKG_DIR" "${PKGNAME}_${PKGVER}-${PKGREL}_$(dpkg --print-architecture).deb"
 
@@ -716,7 +794,47 @@ create_rpm_package() {
         --transform "s|^${CURRENT_DIR}|${PKGNAME}-${PKGVER}|" \
         "${CURRENT_DIR}/"
     cd "${CURRENT_DIR}"
-    
+
+    # Build the conditional PaddleOCR spec fragments. When the vendored ONNX
+    # Runtime + models are present (fetched by ensure_ocr_deps for glibc
+    # formats), the source tarball includes linux/onnxruntime-build and
+    # linux/ocr-models, so rpmbuild can bundle them. The __requires_exclude /
+    # __provides_exclude globals stop rpm's auto dep generator from emitting an
+    # unsatisfiable `Requires: libonnxruntime.so.1` (no Fedora package owns the
+    # vendored, RPATH-resolved .so).
+    RPM_OCR_GLOBALS=""
+    RPM_OCR_INSTALL=""
+    RPM_OCR_FILES=""
+    if ocr_deps_present; then
+        read -r -d '' RPM_OCR_GLOBALS <<'SPECG' || true
+# Vendored ONNX Runtime: bundled in /usr/lib, resolved via the binary RPATH.
+%global __requires_exclude ^libonnxruntime\.so.*$
+%global __provides_exclude ^libonnxruntime\.so.*$
+# The binary intentionally carries a $ORIGIN/../lib RUNPATH so it can load the
+# bundled libonnxruntime from /usr/lib. Fedora's check-rpaths BRP rejects any
+# RPATH/RUNPATH by policy (and trips on the build-tree path CMake adds when
+# linking the vendored .so), so disable it for this self-contained package.
+# The runpath is also cleaned to exactly $ORIGIN/../lib in %install (patchelf).
+%global __brp_check_rpaths %{nil}
+SPECG
+        read -r -d '' RPM_OCR_INSTALL <<'SPECI' || true
+
+# Bundle the vendored PaddleOCR runtime (ONNX Runtime .so + recognition models)
+mkdir -p %{buildroot}/usr/lib
+cp -a linux/onnxruntime-build/lib/libonnxruntime.so* %{buildroot}/usr/lib/
+mkdir -p %{buildroot}/usr/share/speedynote/ocr-models
+cp linux/ocr-models/*.onnx %{buildroot}/usr/share/speedynote/ocr-models/
+# Strip the absolute build-tree ONNX Runtime path (and the trailing empty
+# entry) that CMake bakes into the build-tree binary's RUNPATH, leaving only
+# the relocatable $ORIGIN/../lib (= /usr/lib at runtime).
+patchelf --set-rpath '$ORIGIN/../lib' %{buildroot}/usr/bin/speedynote
+SPECI
+        read -r -d '' RPM_OCR_FILES <<'SPECF' || true
+/usr/lib/libonnxruntime.so*
+/usr/share/speedynote/ocr-models/
+SPECF
+    fi
+
     # Create spec file
     cat > ~/rpmbuild/SPECS/${PKGNAME}.spec << EOF
 Name:           $PKGNAME
@@ -728,6 +846,7 @@ URL:            $URL
 Source0:        %{name}-%{version}.tar.gz
 BuildRequires:  $(get_build_dependencies rpm)
 Requires:       $(get_dependencies rpm)
+${RPM_OCR_GLOBALS}
 
 %description
 SpeedyNote is a fast and efficient note-taking application with PDF annotation,
@@ -780,6 +899,7 @@ done
 
 # Install committed desktop file
 install -Dm644 data/org.speedynote.SpeedyNote.desktop %{buildroot}/usr/share/applications/org.speedynote.SpeedyNote.desktop
+${RPM_OCR_INSTALL}
 
 %post
 /usr/bin/update-desktop-database -q /usr/share/applications || :
@@ -794,7 +914,7 @@ install -Dm644 data/org.speedynote.SpeedyNote.desktop %{buildroot}/usr/share/app
 /usr/share/pixmaps/org.speedynote.SpeedyNote.svg
 /usr/share/doc/%{name}/README.md
 /usr/share/speedynote/translations/
-
+${RPM_OCR_FILES}
 %changelog
 * $(date '+%a %b %d %Y') $MAINTAINER - $PKGVER-$PKGREL
 - Initial package with PDF file association support
@@ -899,6 +1019,19 @@ package() {
 
     # Install committed desktop file
     install -Dm644 "data/org.speedynote.SpeedyNote.desktop" "\$pkgdir/usr/share/applications/org.speedynote.SpeedyNote.desktop"
+
+    # Bundle the vendored PaddleOCR runtime when present (the source tarball
+    # includes linux/ only when fetch scripts ran on the build host). The .so is
+    # resolved at runtime via the binary's \$ORIGIN/../lib RPATH; models are read
+    # from /usr/share/speedynote/ocr-models.
+    if [ -d "linux/onnxruntime-build/lib" ]; then
+        install -dm755 "\$pkgdir/usr/lib"
+        cp -a linux/onnxruntime-build/lib/libonnxruntime.so* "\$pkgdir/usr/lib/"
+    fi
+    if ls linux/ocr-models/*.onnx >/dev/null 2>&1; then
+        install -dm755 "\$pkgdir/usr/share/speedynote/ocr-models"
+        cp linux/ocr-models/*.onnx "\$pkgdir/usr/share/speedynote/ocr-models/"
+    fi
 }
 
 post_install() {
@@ -928,6 +1061,11 @@ EOF
 
 # Function to create Alpine package
 # Uses pre-built binary (proven approach from build-alpine-arm64.sh)
+#
+# NOTE: PaddleOCR is intentionally NOT bundled for Alpine. The prebuilt ONNX
+# Runtime from Microsoft is a glibc binary and cannot load on Alpine's musl
+# libc, so the apk build runs `build_project off` (PaddleOCR disabled) and no
+# ONNX Runtime / model files are shipped. OCR is simply unavailable on Alpine.
 create_apk_package() {
     echo -e "${YELLOW}Creating Alpine package...${NC}"
     
@@ -1150,10 +1288,24 @@ main() {
         check_abuild_keys
     fi
     
+    # Step 2c: Fetch the vendored PaddleOCR deps (ONNX Runtime + models) for the
+    # glibc package formats that bundle them. RPM/Arch build from source, so the
+    # vendored dirs must exist before their source tarballs are created (they
+    # include linux/). apk is musl and deliberately excluded.
+    if [[ " ${PACKAGE_FORMATS[*]} " =~ " deb " ]] \
+       || [[ " ${PACKAGE_FORMATS[*]} " =~ " rpm " ]] \
+       || [[ " ${PACKAGE_FORMATS[*]} " =~ " arch " ]]; then
+        ensure_ocr_deps
+    fi
+
     # Step 3: Build project (needed for DEB and APK which use pre-built binary)
     # RPM and Arch build from source in their respective build systems
-    if [[ " ${PACKAGE_FORMATS[*]} " =~ " deb " ]] || [[ " ${PACKAGE_FORMATS[*]} " =~ " apk " ]]; then
-        build_project
+    if [[ " ${PACKAGE_FORMATS[*]} " =~ " deb " ]]; then
+        # deb is glibc and bundles OCR: let CMake auto-enable it.
+        build_project auto
+    elif [[ " ${PACKAGE_FORMATS[*]} " =~ " apk " ]]; then
+        # apk-only: musl host, OCR forced off (prebuilt ORT is glibc).
+        build_project off
     else
         echo -e "${YELLOW}Skipping pre-build (target formats build from source)${NC}"
     fi

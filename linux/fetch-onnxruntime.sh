@@ -29,16 +29,25 @@ OUTPUT_DIR="${SCRIPT_DIR}/onnxruntime-build"
 ORT_VERSION="1.20.1"
 ORT_ARCH="${ORT_ARCH:-x64}"   # x64 | aarch64
 
-# Optional integrity pin. Microsoft does not publish per-asset SHA256 in a
-# machine-readable form, so this is left empty by default: the script prints
-# the computed digest after download. To lock it down for reproducible builds,
-# paste the printed value here (per arch) and re-run.
-ORT_SHA256_x64=""
-ORT_SHA256_aarch64=""
+# Integrity pin (SHA256 of the release .tgz). Microsoft does not publish a
+# per-asset SHA256 in a machine-readable form, so these must be filled in by
+# hand once per ORT version. To obtain them, run this script once (it prints
+# the computed digest after download), then paste the value for each arch
+# below and re-run; CI will then verify integrity instead of warning.
+#
+#   curl -fSL -o ort.tgz \
+#     https://github.com/microsoft/onnxruntime/releases/download/v1.20.1/onnxruntime-linux-x64-1.20.1.tgz
+#   sha256sum ort.tgz
+#
+# A value may also be supplied out-of-band via the ORT_SHA256 environment
+# variable (takes precedence over the constants below), which lets a release
+# pipeline pin the digest without editing this file.
+ORT_SHA256_x64="67db4dc1561f1e3fd42e619575c82c601ef89849afc7ea85a003abbac1a1a105"
+ORT_SHA256_aarch64="ae4fedbdc8c18d688c01306b4b50c63de3445cdf2dbd720e01a2fa3810b8106a"
 
 case "${ORT_ARCH}" in
-    x64)     ORT_SHA256="${ORT_SHA256_x64}" ;;
-    aarch64) ORT_SHA256="${ORT_SHA256_aarch64}" ;;
+    x64)     ORT_SHA256="${ORT_SHA256:-${ORT_SHA256_x64}}" ;;
+    aarch64) ORT_SHA256="${ORT_SHA256:-${ORT_SHA256_aarch64}}" ;;
     *) echo -e "${RED}Unsupported ORT_ARCH='${ORT_ARCH}' (use x64 or aarch64)${NC}"; exit 1 ;;
 esac
 

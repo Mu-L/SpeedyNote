@@ -1329,8 +1329,15 @@ elseif(UNIX)
         list(GET _ort_so 0 ONNXRUNTIME_LIB)
         list(APPEND PLATFORM_LIBS "${ONNXRUNTIME_LIB}")
         # Resolve the bundled .so next to the install (lib/) at runtime.
+        # BUILD_RPATH is set in addition to the auto-generated absolute path to
+        # the vendored lib, so local `./build/speedynote` dev runs still work
+        # AND the build-tree binary that packaging copies verbatim (deb/apk/
+        # arch/rpm never run `cmake --install`) resolves the bundled lib via
+        # $ORIGIN/../lib once installed under <prefix>/bin with the lib in
+        # <prefix>/lib.
         set_target_properties(speedynote PROPERTIES
             INSTALL_RPATH "$ORIGIN/../lib"
+            BUILD_RPATH   "$ORIGIN/../lib"
             BUILD_WITH_INSTALL_RPATH FALSE)
         message(STATUS "PaddleOCR raster OCR: linking ${ONNXRUNTIME_LIB}")
     endif()

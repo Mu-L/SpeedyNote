@@ -79,6 +79,14 @@
 
 
   <releases type="embedded">
+    <release version="1.4.6" date="2026-06-02">
+      <description>
+        <p>New Features:</p>
+        <ul>
+          <li>Handwriting OCR on Linux: recognize handwritten notes locally and on-device using PaddleOCR, with support for Latin scripts, Chinese, Japanese, and Korean.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.4.6" date="2026-05-18">
       <description>
         <p>Bug Fixes and Improvements:</p>

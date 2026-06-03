@@ -61,6 +61,20 @@ modules:
   # =========================================================================
   # SpeedyNote - main application
   # =========================================================================
+  # PaddleOCR (Linux handwriting OCR) needs a vendored ONNX Runtime + the
+  # PP-OCRv5 recognition models. Flathub has no network during `build`, so they
+  # are declared as checksummed `sources` here (fetched in the download phase)
+  # and laid out under linux/ exactly where CMakeLists.txt expects them
+  # (linux/onnxruntime-build + linux/ocr-models). CMake then auto-enables
+  # PaddleOCR and installs libonnxruntime.so* to /app/lib and the models to
+  # /app/share/speedynote/ocr-models; the INSTALL_RPATH=$ORIGIN/../lib resolves
+  # /app/bin -> /app/lib at runtime. OCR is CPU-only and reads bundled models,
+  # so no extra finish-args (network/devices) are required.
+  #
+  # NOTE: this file is a MIRROR of the manifest in the Flathub repository; the
+  # same changes must be made there. The ONNX Runtime archive SHA256 and the
+  # app archive SHA256 below are PLACEHOLDERS that must be filled with the real
+  # digests (sha256sum of each downloaded file / the release tarball).
   - name: speedynote
     buildsystem: cmake-ninja
     config-opts:
@@ -68,6 +82,40 @@ modules:
       - -DMUPDF_INCLUDE_DIR=/app/include
     sources:
       - type: archive
-        url: https://github.com/alpha-liu-01/SpeedyNote/archive/refs/tags/v1.4.1.tar.gz
-        sha256: fab4daf306e7b5b669ea256620b6ae2659c7a7e170432941cb81e721e56706c1
+        url: https://github.com/alpha-liu-01/SpeedyNote/archive/refs/tags/v1.4.6.tar.gz
+        sha256: 0000000000000000000000000000000000000000000000000000000000000000  # TODO: sha256 of the v1.4.6 release tarball
+      # --- Vendored ONNX Runtime (CPU EP), per target arch ------------------
+      # Extracts onnxruntime-linux-<arch>-1.20.1/{include,lib,...}; strip the
+      # top-level dir so it lands at linux/onnxruntime-build/{include,lib}.
+      - type: archive
+        only-arches:
+          - x86_64
+        url: https://github.com/microsoft/onnxruntime/releases/download/v1.20.1/onnxruntime-linux-x64-1.20.1.tgz
+        sha256: 67db4dc1561f1e3fd42e619575c82c601ef89849afc7ea85a003abbac1a1a105  # TODO: sha256 of onnxruntime-linux-x64-1.20.1.tgz
+        dest: linux/onnxruntime-build
+        strip-components: 1
+      - type: archive
+        only-arches:
+          - aarch64
+        url: https://github.com/microsoft/onnxruntime/releases/download/v1.20.1/onnxruntime-linux-aarch64-1.20.1.tgz
+        sha256: ae4fedbdc8c18d688c01306b4b50c63de3445cdf2dbd720e01a2fa3810b8106a  # TODO: sha256 of onnxruntime-linux-aarch64-1.20.1.tgz
+        dest: linux/onnxruntime-build
+        strip-components: 1
+      # --- PP-OCRv5 mobile recognition models (arch-independent) ------------
+      # SHA256s match linux/fetch-ocr-models.sh. Dicts are embedded in the ONNX.
+      - type: file
+        url: https://huggingface.co/RapidAI/RapidOCR/resolve/v3.8.0/onnx/PP-OCRv5/rec/latin_PP-OCRv5_rec_mobile.onnx
+        sha256: b20bd37c168a570f583afbc8cd7925603890efbcdc000a59e22c269d160b5f5a
+        dest: linux/ocr-models
+        dest-filename: latin_rec.onnx
+      - type: file
+        url: https://huggingface.co/RapidAI/RapidOCR/resolve/v3.8.0/onnx/PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile.onnx
+        sha256: 5825fc7ebf84ae7a412be049820b4d86d77620f204a041697b0494669b1742c5
+        dest: linux/ocr-models
+        dest-filename: ch_rec.onnx
+      - type: file
+        url: https://huggingface.co/RapidAI/RapidOCR/resolve/v3.8.0/onnx/PP-OCRv5/rec/korean_PP-OCRv5_rec_mobile.onnx
+        sha256: cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9c41a2e541a25773c9b
+        dest: linux/ocr-models
+        dest-filename: korean_rec.onnx
 
