@@ -369,11 +369,14 @@ void OcrWorker::processPage(const QString& pageId,
     if (useSnap) {
         QVector<StrokeLineGroup> groups;
         if (snap.cjkGridMode && snap.backgroundIsGrid) {
+            // Grid-cell snapping ONLY for CJK (snap.cjkGridMode is already gated
+            // on a CJK language in MainWindow::buildOcrSnapParams).
             groups = groupStrokesByGridCells(filtered, snap.gridSpacing);
-        } else if (snap.backgroundIsLines) {
-            groups = groupStrokesByLineBands(filtered, snap.lineSpacing);
         } else {
-            groups = groupStrokesByLineBands(filtered, snap.gridSpacing);
+            // Everything else (Latin on grid OR lines): line snapping by line
+            // spacing, regardless of the background style. Grid spacing is never
+            // used for non-CJK text.
+            groups = groupStrokesByLineBands(filtered, snap.lineSpacing);
         }
 
         QVector<OcrEngine::Result> allResults;
@@ -550,11 +553,12 @@ void OcrWorker::processBatch(const QVector<QString>& pageIds,
         if (useSnap) {
             QVector<StrokeLineGroup> groups;
             if (snap.cjkGridMode && snap.backgroundIsGrid) {
+                // Grid-cell snapping ONLY for CJK (see processPage).
                 groups = groupStrokesByGridCells(filtered, snap.gridSpacing);
-            } else if (snap.backgroundIsLines) {
-                groups = groupStrokesByLineBands(filtered, snap.lineSpacing);
             } else {
-                groups = groupStrokesByLineBands(filtered, snap.gridSpacing);
+                // Latin on grid OR lines: line snapping by line spacing,
+                // regardless of background style.
+                groups = groupStrokesByLineBands(filtered, snap.lineSpacing);
             }
 
             for (const auto& group : groups) {

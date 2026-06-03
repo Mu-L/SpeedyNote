@@ -6373,7 +6373,6 @@ void MainWindow::syncOcrTextObjects(Page* page, const QVector<OcrTextBlock>& blo
     bool isGrid = (page->backgroundType == Page::BackgroundType::Grid);
     bool isLines = (page->backgroundType == Page::BackgroundType::Lines);
     bool pageSnap = doc && doc->ocrSnapToBackground && (isGrid || isLines);
-    int snapSpacing = isGrid ? page->gridSpacing : page->lineSpacing;
     bool pageCjk = false;
     if (pageSnap && isGrid) {
         QSettings settings("SpeedyNote", "App");
@@ -6381,6 +6380,9 @@ void MainWindow::syncOcrTextObjects(Page* page, const QVector<OcrTextBlock>& blo
             pageCjk = isCjkOcrLanguage(resolveOcrLanguage(doc));
         }
     }
+    // Grid spacing only drives the CJK grid-cell overlay; line snapping (every
+    // non-CJK case) uses line spacing regardless of background.
+    int snapSpacing = pageCjk ? page->gridSpacing : page->lineSpacing;
 
     for (const auto& block : blocks) {
         if (block.dirty || block.text.isEmpty())
@@ -6433,11 +6435,11 @@ void MainWindow::setOcrTextVisibility(bool visible)
         bool isGrid = (page->backgroundType == Page::BackgroundType::Grid);
         bool isLines = (page->backgroundType == Page::BackgroundType::Lines);
         bool pageSnap = snapEnabled && (isGrid || isLines);
-        int spacing = isGrid ? page->gridSpacing : page->lineSpacing;
         bool pageCjk = false;
         if (pageSnap && cjkGlobal && isGrid) {
             pageCjk = isCjkOcrLanguage(resolveOcrLanguage(doc));
         }
+        int spacing = pageCjk ? page->gridSpacing : page->lineSpacing;
 
         for (const auto& obj : page->objects) {
             if (obj && obj->type() == QStringLiteral("ocr_text")) {
@@ -6511,7 +6513,11 @@ OcrSnapParams MainWindow::buildOcrSnapParams(Document* doc, Page* page) const
 
     snap.enabled = doc->ocrSnapToBackground;
     QSettings settings("SpeedyNote", "App");
-    snap.cjkGridMode = settings.value("ocrCjkGridMode", false).toBool();
+    // Grid-cell snapping exists only for CJK: it requires both the toggle AND a
+    // CJK OCR language. For every non-CJK language we fall back to line snapping
+    // regardless of background (see OcrWorker grouping).
+    snap.cjkGridMode = settings.value("ocrCjkGridMode", false).toBool()
+                       && isCjkOcrLanguage(resolveOcrLanguage(doc));
     snap.gridSpacing = page->gridSpacing;
     snap.lineSpacing = page->lineSpacing;
     snap.backgroundIsGrid = (page->backgroundType == Page::BackgroundType::Grid);
