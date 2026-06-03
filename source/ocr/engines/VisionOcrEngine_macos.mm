@@ -103,6 +103,16 @@ VisionOcrEngine::recognizeImage(const QImage& strip, const QString& languageTag)
         //    observations) so that charBoxesImage.size() == text.length() always
         //    holds. Vision boxes are normalized with a bottom-left origin, so we
         //    flip Y and denormalize to strip-image pixels (QA Q3.1/Q3.4).
+        //
+        //    NOTE: Vision does NOT expose per-glyph geometry. -boundingBoxForRange:
+        //    returns the box of the WHOLE candidate string for every sub-range
+        //    (verified on macOS: all single-char ranges of "Hello" returned one
+        //    identical box). Consuming those directly makes per-character overlay
+        //    glyphs and text selection collapse onto each other. We therefore
+        //    subdivide each observation's box uniformly by character, yielding
+        //    monotonic, non-overlapping per-char boxes. The word-level union
+        //    (WordSegment::boundingRect) is unchanged, so word placement/copy is
+        //    unaffected; only intra-word per-char positions become approximate.
         NSArray<VNRecognizedTextObservation *> *obs = [req.results
             sortedArrayUsingComparator:^NSComparisonResult(VNRecognizedTextObservation *a,
                                                            VNRecognizedTextObservation *b) {
@@ -129,22 +139,20 @@ VisionOcrEngine::recognizeImage(const QImage& strip, const QString& languageTag)
                 boxes.append(QRectF()); // null box keeps the size invariant
             }
 
+            // Observation box in strip-image pixels (flip Y, denormalize).
+            const CGRect bb = o.boundingBox;
+            const qreal obsX = bb.origin.x * W;
+            const qreal obsY = (1.0 - bb.origin.y - bb.size.height) * H;
+            const qreal obsW = bb.size.width * W;
+            const qreal obsH = bb.size.height * H;
+            const int n = static_cast<int>(s.length);
+            const qreal charW = n > 0 ? obsW / n : obsW;
+
             for (NSUInteger i = 0; i < s.length; ++i) {
                 const NSRange range = NSMakeRange(i, 1);
-
-                NSError *rangeErr = nil;
-                VNRectangleObservation *r = [cand boundingBoxForRange:range error:&rangeErr];
-                QRectF px;
-                if (r) {
-                    const CGRect b = r.boundingBox;
-                    px = QRectF(b.origin.x * W,
-                                (1.0 - b.origin.y - b.size.height) * H,
-                                b.size.width * W,
-                                b.size.height * H);
-                }
-
                 text.append(QString::fromNSString([s substringWithRange:range]));
-                boxes.append(px);
+                boxes.append(QRectF(obsX + static_cast<qreal>(i) * charW,
+                                    obsY, charW, obsH));
             }
         }
 

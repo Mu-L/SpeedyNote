@@ -86,6 +86,29 @@ inline bool runAllTests()
     qDebug() << "Recognized text:" << rec.text
              << "| char boxes:" << rec.charBoxesImage.size();
 
+    // Vision's -boundingBoxForRange: collapses every sub-range to the whole-word
+    // box, so the engine subdivides each observation uniformly per character.
+    // Guard against a regression to identical (stacked) boxes: within a run of
+    // non-null boxes, x must be strictly increasing.
+    {
+        int compared = 0, monotonic = 0;
+        for (int i = 1; i < rec.charBoxesImage.size(); ++i) {
+            const QRectF& a = rec.charBoxesImage[i - 1];
+            const QRectF& b = rec.charBoxesImage[i];
+            if (a.isNull() || b.isNull())
+                continue; // inter-observation separator
+            ++compared;
+            if (b.x() > a.x() + 1e-3)
+                ++monotonic;
+        }
+        if (compared > 0 && monotonic != compared) {
+            qWarning() << "FAIL: per-char boxes not strictly increasing in x"
+                       << "(" << monotonic << "/" << compared << ")";
+            return false;
+        }
+        qDebug() << "Per-char box monotonicity OK (" << monotonic << "/" << compared << ")";
+    }
+
     bool ok = !rec.text.isEmpty();
     if (!ok)
         qDebug() << "FAIL: Vision returned empty text for printed input.";
