@@ -89,6 +89,7 @@
         <p>Bug Fixes and Improvements:</p>
         <ul>
           <li>Fixed the problem that pages with very high vertical resolution were not rendered.</li>
+        </ul>
       </description>
     </release>
     <release version="1.4.6" date="2026-05-18">
