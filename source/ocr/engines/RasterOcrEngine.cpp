@@ -6,6 +6,10 @@
 
 #include <QLocale>
 #include <QSet>
+#include <QStringList>
+#ifdef SPEEDYNOTE_DEBUG
+#include <QDebug>
+#endif
 
 #include <algorithm>
 
@@ -71,28 +75,87 @@ RasterOcrEngine::RasterOcrEngine()
 
 RasterOcrEngine::~RasterOcrEngine() = default;
 
+QString RasterOcrEngine::resolveAutoLanguage(const QString& langSubtag,
+                                             const QString& script,
+                                             const QString& bcp47Name,
+                                             const QString& localeName,
+                                             const QStringList& available)
+{
+    const QString lang = langSubtag.toLower();
+    if (lang.isEmpty() || available.isEmpty())
+        return {};
+
+    // QLocale may report AnyScript for a Han language (e.g. "zh_CA"); infer the
+    // script from the region so we can still pick zh-Hans vs zh-Hant.
+    QString effScript = script;
+    if (lang == QLatin1String("zh") && effScript.isEmpty()) {
+        const QString region = localeName.section(QLatin1Char('_'), 1, 1).toUpper();
+        effScript = (region == QLatin1String("TW") || region == QLatin1String("HK") ||
+                     region == QLatin1String("MO"))
+                        ? QStringLiteral("Hant")
+                        : QStringLiteral("Hans");
+    }
+
+    // Prioritized candidate tags: most specific first.
+    QStringList candidates;
+    if (!effScript.isEmpty())
+        candidates << (lang + QLatin1Char('-') + effScript);   // e.g. zh-Hans
+    if (!bcp47Name.isEmpty())
+        candidates << bcp47Name;                                // e.g. zh-Hant
+    candidates << QString(localeName).replace(QLatin1Char('_'), QLatin1Char('-')); // zh-CA
+    candidates << lang;                                         // zh
+
+    // Pass 1: exact (case-insensitive) match against the backend's tags.
+    for (const QString& c : candidates) {
+        if (c.isEmpty())
+            continue;
+        for (const QString& a : available) {
+            if (a.compare(c, Qt::CaseInsensitive) == 0)
+                return a;
+        }
+    }
+
+    // Pass 2: language-subtag fallback. Prefer a tag carrying the right script
+    // (zh-Hans), otherwise the first tag sharing the primary subtag.
+    QString langFallback;
+    for (const QString& a : available) {
+        if (a.section(QLatin1Char('-'), 0, 0).compare(lang, Qt::CaseInsensitive) != 0)
+            continue;
+        if (!effScript.isEmpty() && a.contains(effScript, Qt::CaseInsensitive))
+            return a;
+        if (langFallback.isEmpty())
+            langFallback = a;
+    }
+    return langFallback;
+}
+
 void RasterOcrEngine::setLanguage(const QString& recognizerName)
 {
     // Normalize the "auto-detect" sentinels. The OCR UI uses two of them: an
     // empty string (Settings combo) and the literal "auto" (per-document
     // dialog). Neither is a valid recognizer tag, so passing them straight
     // through would make a raster backend mis-recognize - e.g. Apple Vision
-    // would receive recognitionLanguages = @["auto"]. Resolve them to the
-    // system-locale tag when the backend supports it, otherwise to an empty
-    // tag, which each backend treats as "use the engine default" (Vision omits
-    // recognitionLanguages; Paddle falls back to its default latin model).
+    // would receive recognitionLanguages = @["auto"]. Resolve them to a tag the
+    // backend actually exposes, otherwise to an empty tag, which each backend
+    // treats as "use the engine default" (Vision omits recognitionLanguages;
+    // Paddle falls back to its default latin model).
     QString resolved = recognizerName;
     if (resolved.isEmpty() || resolved.compare(QStringLiteral("auto"), Qt::CaseInsensitive) == 0) {
-        resolved.clear();
-        const QString sysTag = QLocale::system().name().replace(QLatin1Char('_'), QLatin1Char('-'));
-        if (!sysTag.isEmpty()) {
-            for (const QString& tag : availableLanguages()) {
-                if (tag.compare(sysTag, Qt::CaseInsensitive) == 0) {
-                    resolved = tag;
-                    break;
-                }
-            }
+        const QLocale sys = QLocale::system();
+        QString script;
+        switch (sys.script()) {
+        case QLocale::SimplifiedHanScript:  script = QStringLiteral("Hans"); break;
+        case QLocale::TraditionalHanScript: script = QStringLiteral("Hant"); break;
+        default: break;
         }
+        resolved = resolveAutoLanguage(sys.name().section(QLatin1Char('_'), 0, 0),
+                                       script, sys.bcp47Name(), sys.name(),
+                                       availableLanguages());
+#ifdef SPEEDYNOTE_DEBUG
+        qDebug() << "[OCR] auto language: name" << sys.name()
+                 << "bcp47" << sys.bcp47Name() << "script" << script
+                 << "-> resolved" << (resolved.isEmpty() ? QStringLiteral("(engine default)") : resolved);
+#endif
     }
 
     if (resolved != m_languageTag) {

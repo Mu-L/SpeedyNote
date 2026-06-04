@@ -12621,6 +12621,12 @@ void DocumentViewport::clearUndoStacksFrom(int pageIndex)
     
     if (hadUndo && !canUndo()) emit undoAvailableChanged(false);
     if (hadRedo && !canRedo()) emit redoAvailableChanged(false);
+
+    // Pages at/after pageIndex are shifting, so any pending OCR dirty indices in
+    // that range now point at the wrong page. Drop them (same reasoning as the
+    // undo-stack purge above); the affected pages re-mark themselves dirty on the
+    // next edit.
+    m_ocrDirtyPages.erase(m_ocrDirtyPages.lower_bound(pageIndex), m_ocrDirtyPages.end());
 }
 
 // ============================================================================

@@ -6015,15 +6015,25 @@ void MainWindow::triggerOcrForCurrentPage()
                     Q_ARG(OcrSnapParams, buildOcrSnapParams(doc, tile)));
         }
     } else {
-        int pageIndex = vp->currentPageIndex();
-        Page* page = doc->page(pageIndex);
-        if (!page) return;
-        QVector<VectorStroke> strokes = collectPageStrokes(page);
-        QMetaObject::invokeMethod(m_ocrWorker, "processPage", Qt::QueuedConnection,
-            Q_ARG(QString, docTag + QStringLiteral("|") + page->uuid),
-            Q_ARG(QVector<VectorStroke>, strokes),
-            Q_ARG(QSet<QString>, page->suppressedStrokeIds),
-            Q_ARG(OcrSnapParams, buildOcrSnapParams(doc, page)));
+        // Scan every page currently in the viewport, not just the centered one,
+        // mirroring the edgeless branch (all loaded tiles) and the auto-OCR
+        // behavior. Continuous/two-column layouts routinely show 2+ pages, so a
+        // single-page scan was surprising. Fall back to the current page when
+        // nothing is reported visible (defensive).
+        QVector<int> pageIndices = vp->visiblePages();
+        if (pageIndices.isEmpty())
+            pageIndices.append(vp->currentPageIndex());
+
+        for (int pageIndex : pageIndices) {
+            Page* page = doc->page(pageIndex);
+            if (!page) continue;
+            QVector<VectorStroke> strokes = collectPageStrokes(page);
+            QMetaObject::invokeMethod(m_ocrWorker, "processPage", Qt::QueuedConnection,
+                Q_ARG(QString, docTag + QStringLiteral("|") + page->uuid),
+                Q_ARG(QVector<VectorStroke>, strokes),
+                Q_ARG(QSet<QString>, page->suppressedStrokeIds),
+                Q_ARG(OcrSnapParams, buildOcrSnapParams(doc, page)));
+        }
     }
 }
 
