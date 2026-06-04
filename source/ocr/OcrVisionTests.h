@@ -151,6 +151,13 @@ inline bool runAllTests()
         } else {
             qDebug() << "Auto-detect resolved to tag:" << (resolved.isEmpty() ? "<engine default>" : resolved);
         }
+        // A non-empty resolved tag must be a real Vision recognition language
+        // (never a raw locale tag like "zh-CA" that Vision would reject).
+        if (!resolved.isEmpty() && !engine.availableLanguages().contains(resolved)) {
+            ok = false;
+            qDebug() << "FAIL: resolved tag" << resolved
+                     << "is not a supported Vision recognition language.";
+        }
         const auto recAuto = engine.runRecognize(strip, resolved);
         if (recAuto.text.isEmpty()) {
             ok = false;

@@ -426,6 +426,64 @@ inline bool testFlattenCharRectsOverload()
     return ok;
 }
 
+// ----------------------------------------------------------------------------
+// Test: resolveAutoLanguage maps a system locale to a backend tag. Vision-style
+// available list uses script-tagged Chinese (zh-Hans/zh-Hant), so a naive exact
+// match on "zh-CA" fails - this verifies the tiered match picks the right tag.
+// ----------------------------------------------------------------------------
+inline bool testResolveAutoLanguage()
+{
+    qDebug() << "=== Test: Resolve Auto Language ===";
+    bool ok = true;
+
+    // Vision-like supported set.
+    const QStringList vision = {
+        QStringLiteral("en-US"), QStringLiteral("fr-FR"), QStringLiteral("de-DE"),
+        QStringLiteral("ja-JP"), QStringLiteral("ko-KR"),
+        QStringLiteral("zh-Hans"), QStringLiteral("zh-Hant"),
+    };
+
+    struct Case {
+        QString lang, script, bcp47, name, expected, label;
+    };
+    const QVector<Case> cases = {
+        // The reported bug: Simplified-Chinese system shown as zh_CA.
+        {QStringLiteral("zh"), QStringLiteral("Hans"), QStringLiteral("zh-Hans"),
+         QStringLiteral("zh_CA"), QStringLiteral("zh-Hans"), QStringLiteral("zh_CA + Hans")},
+        // No script from QLocale -> infer from region.
+        {QStringLiteral("zh"), QString(), QString(),
+         QStringLiteral("zh_TW"), QStringLiteral("zh-Hant"), QStringLiteral("zh_TW (region-inferred)")},
+        {QStringLiteral("zh"), QString(), QString(),
+         QStringLiteral("zh_CN"), QStringLiteral("zh-Hans"), QStringLiteral("zh_CN (region-inferred)")},
+        // Subtag fallback: fr-CA not present, fr-FR is.
+        {QStringLiteral("fr"), QString(), QStringLiteral("fr-CA"),
+         QStringLiteral("fr_CA"), QStringLiteral("fr-FR"), QStringLiteral("fr_CA -> fr-FR")},
+        // Exact match wins when present.
+        {QStringLiteral("ja"), QString(), QStringLiteral("ja-JP"),
+         QStringLiteral("ja_JP"), QStringLiteral("ja-JP"), QStringLiteral("ja_JP exact")},
+        // No backend support -> empty (engine default).
+        {QStringLiteral("xx"), QString(), QString(),
+         QStringLiteral("xx_YY"), QString(), QStringLiteral("unknown -> empty")},
+    };
+
+    for (const Case& c : cases) {
+        const QString got = RasterOcrEngine::resolveAutoLanguage(
+            c.lang, c.script, c.bcp47, c.name, vision);
+        const bool caseOk = (got == c.expected);
+        qDebug() << "  " << c.label << ":" << (caseOk ? "ok" : "FAIL")
+                 << "got" << (got.isEmpty() ? QStringLiteral("(empty)") : got);
+        ok = ok && caseOk;
+    }
+
+    // Empty available list -> empty (no crash).
+    ok = ok && RasterOcrEngine::resolveAutoLanguage(
+                   QStringLiteral("zh"), QStringLiteral("Hans"),
+                   QStringLiteral("zh-Hans"), QStringLiteral("zh_CN"), {}).isEmpty();
+
+    qDebug() << (ok ? "PASS" : "FAIL") << "- resolve auto language";
+    return ok;
+}
+
 inline bool runAllTests()
 {
     qDebug() << "\n========================================";
@@ -441,6 +499,7 @@ inline bool runAllTests()
     allPass &= testCharBoxJsonRoundTrip();
     allPass &= testFlattenBlockCharRects();
     allPass &= testFlattenCharRectsOverload();
+    allPass &= testResolveAutoLanguage();
 
     qDebug() << "\n========================================";
     qDebug() << (allPass ? "ALL TESTS PASSED!" : "SOME TESTS FAILED!");

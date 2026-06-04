@@ -46,6 +46,30 @@ public:
     void setLanguage(const QString& recognizerName) override;
     QString language() const override;
 
+    /**
+     * @brief Resolve an auto-detect locale to a tag the backend actually exposes.
+     *
+     * Used by setLanguage() when the UI passes the "auto" / empty sentinel. Pure
+     * (no QLocale access) so it is deterministically unit-testable. The system
+     * locale tag (e.g. "zh-CA") rarely equals a backend tag (Vision exposes only
+     * script-tagged Chinese like "zh-Hans"/"zh-Hant"), so a naive exact match
+     * fails and the engine wrongly falls back to English. This does a tiered
+     * match instead.
+     *
+     * @param langSubtag Primary language subtag, e.g. "zh", "en" (case-insensitive).
+     * @param script     Han script hint "Hans"/"Hant" or empty (from QLocale::script()).
+     * @param bcp47Name  QLocale::bcp47Name(), e.g. "zh-Hans" (may already carry script).
+     * @param localeName QLocale::name(), e.g. "zh_CA" (region used to infer script).
+     * @param available  Backend's availableLanguages().
+     * @return A member of @p available, or empty when nothing matches (caller then
+     *         leaves the tag empty so the backend uses its own default).
+     */
+    static QString resolveAutoLanguage(const QString& langSubtag,
+                                       const QString& script,
+                                       const QString& bcp47Name,
+                                       const QString& localeName,
+                                       const QStringList& available);
+
     void addStrokes(const QVector<VectorStroke>& strokes) override;
     void removeStrokes(const QVector<QString>& strokeIds) override;
     void clearStrokes() override;
