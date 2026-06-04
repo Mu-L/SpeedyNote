@@ -12539,6 +12539,13 @@ std::set<Document::TileCoord> DocumentViewport::takeOcrDirtyTiles()
     return result;
 }
 
+std::set<int> DocumentViewport::takeOcrDirtyPages()
+{
+    std::set<int> result;
+    result.swap(m_ocrDirtyPages);
+    return result;
+}
+
 void DocumentViewport::markOcrDirtyTiles(const UndoAction& action)
 {
     if (!m_document || !m_document->isEdgeless()) return;
@@ -12559,8 +12566,10 @@ void DocumentViewport::pushPageStrokeUndo(int pageIndex, UndoAction::Type type, 
     seg.stroke = stroke;
     action.segments.append(seg);
     pushUndoAction(action);
-    if (!m_document->isEdgeless())
+    if (!m_document->isEdgeless()) {
         emit pageModified(pageIndex);
+        m_ocrDirtyPages.insert(pageIndex);
+    }
     emit strokesChanged();
 }
 
@@ -12575,8 +12584,10 @@ void DocumentViewport::pushPageStrokesUndo(int pageIndex, UndoAction::Type type,
         action.segments.append(seg);
     }
     pushUndoAction(action);
-    if (!m_document->isEdgeless())
+    if (!m_document->isEdgeless()) {
         emit pageModified(pageIndex);
+        m_ocrDirtyPages.insert(pageIndex);
+    }
     emit strokesChanged();
 }
 
@@ -13016,8 +13027,11 @@ void DocumentViewport::undo()
         // RecolorStrokes leaves the stroke set unchanged (only colours move),
         // so it gets the strokesChanged repaint but skips OCR dirty-marking
         // (text content is unaffected by colour).
-        if (action.type != UndoAction::RecolorStrokes)
+        if (action.type != UndoAction::RecolorStrokes) {
             markOcrDirtyTiles(action);
+            if (!m_document->isEdgeless())
+                for (int p : collectAffectedPages(action)) m_ocrDirtyPages.insert(p);
+        }
         emit strokesChanged();
     }
     if (!m_document->isEdgeless())
@@ -13304,8 +13318,11 @@ void DocumentViewport::redo()
         // RecolorStrokes leaves the stroke set unchanged (only colours move),
         // so it gets the strokesChanged repaint but skips OCR dirty-marking
         // (text content is unaffected by colour).
-        if (action.type != UndoAction::RecolorStrokes)
+        if (action.type != UndoAction::RecolorStrokes) {
             markOcrDirtyTiles(action);
+            if (!m_document->isEdgeless())
+                for (int p : collectAffectedPages(action)) m_ocrDirtyPages.insert(p);
+        }
         emit strokesChanged();
     }
     if (!m_document->isEdgeless())
