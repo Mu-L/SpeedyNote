@@ -6117,7 +6117,10 @@ void MainWindow::onDebounceTimeout()
             Page* tile = doc->getTile(coord.first, coord.second);
             if (!tile) continue;
             QVector<VectorStroke> strokes = collectPageStrokes(tile);
-            if (strokes.isEmpty()) continue;
+            // Nothing to scan and nothing to clear -> skip. When the last ink on
+            // a tile was erased (strokes empty but OCR blocks remain), still queue
+            // so the worker returns empty blocks and the overlay/sidecar clear.
+            if (strokes.isEmpty() && tile->ocrTextBlocks.isEmpty()) continue;
             if (!anyQueued) {
                 m_toolbar->ocrSubToolbar()->setStatusText(tr("Auto-scanning..."));
                 anyQueued = true;
@@ -6130,19 +6133,36 @@ void MainWindow::onDebounceTimeout()
                 Q_ARG(OcrSnapParams, buildOcrSnapParams(doc, tile)));
         }
     } else {
-        int idx = vp->currentPageIndex();
-        Page* page = doc->page(idx);
-        if (!page) return;
+        // Scan every page edited since the last debounce, not just the current
+        // one, so writing on multiple pages within one window OCRs them all.
+        // Fallback to the current page keeps any stroke path that only emits
+        // strokesChanged (without marking a dirty page) working.
+        auto dirtyPages = vp->takeOcrDirtyPages();
+        if (dirtyPages.empty())
+            dirtyPages.insert(vp->currentPageIndex());
 
-        QVector<VectorStroke> strokes = collectPageStrokes(page);
-        if (strokes.isEmpty()) return;
+        bool anyQueued = false;
+        for (int idx : dirtyPages) {
+            Page* page = doc->page(idx);
+            if (!page) continue;
 
-        m_toolbar->ocrSubToolbar()->setStatusText(tr("Auto-scanning..."));
-        QMetaObject::invokeMethod(m_ocrWorker, "processPageIncremental", Qt::QueuedConnection,
-            Q_ARG(QString, docTag + QStringLiteral("|") + page->uuid),
-            Q_ARG(QVector<VectorStroke>, strokes),
-            Q_ARG(QSet<QString>, page->suppressedStrokeIds),
-            Q_ARG(OcrSnapParams, buildOcrSnapParams(doc, page)));
+            QVector<VectorStroke> strokes = collectPageStrokes(page);
+            // Nothing to scan and nothing to clear -> skip. When the last ink was
+            // erased (strokes empty but OCR blocks remain), still queue so the
+            // worker returns empty blocks and the overlay/sidecar clear.
+            if (strokes.isEmpty() && page->ocrTextBlocks.isEmpty())
+                continue;
+
+            if (!anyQueued) {
+                m_toolbar->ocrSubToolbar()->setStatusText(tr("Auto-scanning..."));
+                anyQueued = true;
+            }
+            QMetaObject::invokeMethod(m_ocrWorker, "processPageIncremental", Qt::QueuedConnection,
+                Q_ARG(QString, docTag + QStringLiteral("|") + page->uuid),
+                Q_ARG(QVector<VectorStroke>, strokes),
+                Q_ARG(QSet<QString>, page->suppressedStrokeIds),
+                Q_ARG(OcrSnapParams, buildOcrSnapParams(doc, page)));
+        }
     }
 }
 

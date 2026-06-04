@@ -701,6 +701,11 @@ public:
 
     std::set<Document::TileCoord> takeOcrDirtyTiles();
 
+    /// Paged-mode counterpart to takeOcrDirtyTiles(): returns and clears the set
+    /// of page indices edited since the last call, so the OCR debounce can scan
+    /// every touched page (not just the current one).
+    std::set<int> takeOcrDirtyPages();
+
     // ===== Affinity Helpers (Phase O3.5.3) =====
     
     /**
@@ -2565,6 +2570,9 @@ private:
 
     std::set<Document::TileCoord> m_ocrDirtyTiles;
     void markOcrDirtyTiles(const UndoAction& action);
+
+    // Paged-mode dirty page indices awaiting OCR (edgeless uses m_ocrDirtyTiles).
+    std::set<int> m_ocrDirtyPages;
     
     // ===== Edgeless Position History (Phase 4) =====
     QList<QPointF> m_edgelessPositionHistory;         ///< Previous viewport positions (oldest first)
