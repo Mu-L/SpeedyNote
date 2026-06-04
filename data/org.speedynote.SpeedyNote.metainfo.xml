@@ -79,6 +79,19 @@
 
 
   <releases type="embedded">
+    <release version="1.4.8" date="2026-06-04">
+      <description>
+        <p>Bug Fixes and Improvements:</p>
+        <ul>
+          <li>Fixed the problem that not both pages were OCR'd when the user wrote on both before a scan.</li>
+          <li>Fixed the problem that the OCR scanning button on the subtoolbar only scanned one page.</li>
+          <li>Fixed the problem that the font size on the OCR text overlay could be too big to fix in on the overlay.</li>
+          <li>Disabled grid snapping unless CJK grid snapping is enabled to increase accuracy..</li>
+          <li>Fixed the problem that all characters of a word could stack together on the OCR text overlay when line snapping was not enabled on the Mac version.</li>
+          <li>Fixed the problem that erasing didn't trigger an OCR text update.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.4.7" date="2026-06-02">
       <description>
         <p>New Features:</p>
